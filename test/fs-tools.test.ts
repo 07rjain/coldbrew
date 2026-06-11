@@ -415,6 +415,36 @@ describe('filesystem tools', () => {
       writeFileTool.execute({ file: '../outside.txt', content: 'nope', overwrite: null }),
     ).rejects.toThrow('Path escapes project root');
   });
+
+  it('runs allowlisted commands', async () => {
+    await initGitRepo(tempDir);
+    await writeFile(path.join(tempDir, 'changed.txt'), 'changed', 'utf8');
+    const runCommand = getTool(createFileTools({
+      allowEdits: false,
+      projectRoot: tempDir,
+    }), 'run_command');
+
+    await expect(
+      runCommand.execute({ command: 'git status --short', maxBytes: null }),
+    ).resolves.toMatchObject({
+      command: 'git status --short',
+      exitCode: 0,
+      ok: true,
+      stdout: expect.stringContaining('changed.txt'),
+      truncated: false,
+    });
+  });
+
+  it('rejects commands outside the allowlist', async () => {
+    const runCommand = getTool(createFileTools({
+      allowEdits: false,
+      projectRoot: tempDir,
+    }), 'run_command');
+
+    await expect(
+      runCommand.execute({ command: 'rm -rf .', maxBytes: null }),
+    ).rejects.toThrow('Command is not allowlisted');
+  });
 });
 
 function getTool(tools: ToolDefinition[], name: string): ToolDefinition {

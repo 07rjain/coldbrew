@@ -66,6 +66,7 @@ Filesystem tools are intentionally constrained:
 - Binary-looking files are rejected.
 - Search uses `rg` without a shell, with capped result count and output size.
 - Git diff uses `git diff` without a shell, with optional path scoping and capped output.
+- Command execution is allowlisted to `pnpm test`, `pnpm build`, `pnpm lint`, and `git status --short`.
 - Tree listing is depth-limited, entry-limited, and skips generated/vendor directories.
 - Common generated/vendor directories are hidden from `list_files`.
 - `edit_file` is dry-run by default.
@@ -73,7 +74,7 @@ Filesystem tools are intentionally constrained:
 - Writes require `--allow-edits`.
 - `edit_file` only replaces text when `oldText` occurs exactly once.
 
-This is not a full sandbox. Do not add shell execution or network tools without an explicit approval model and tests.
+This is not a full sandbox. Do not expand command execution, shell execution, or network tools without an explicit approval model and tests.
 
 ## Adding Tools
 

@@ -25,13 +25,13 @@ Include:
 - Binary-looking files are rejected.
 - `edit_file` is dry-run by default.
 - Writes require `--allow-edits`.
-- Shell command execution is not available.
+- Arbitrary shell command execution is not available. `run_command` supports only a small hardcoded verification allowlist.
 
 These controls reduce risk but do not make this a full sandbox.
 
 ## Maintainer Guidance
 
-Do not add shell execution, network mutation tools, destructive file operations, or credential-reading tools without:
+Do not expand command execution, shell execution, network mutation tools, destructive file operations, or credential-reading tools without:
 
 - explicit approval gates
 - tests for denied and allowed paths

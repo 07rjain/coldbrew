@@ -11,6 +11,7 @@ const DEFAULT_MAX_WRITE_BYTES = 512_000;
 const DEFAULT_MAX_SEARCH_RESULTS = 50;
 const DEFAULT_MAX_SEARCH_OUTPUT_BYTES = 64_000;
 const DEFAULT_MAX_DIFF_BYTES = 96_000;
+const DEFAULT_MAX_COMMAND_OUTPUT_BYTES = 96_000;
 const DEFAULT_TREE_DEPTH = 2;
 const DEFAULT_TREE_MAX_ENTRIES = 200;
 const DEFAULT_IGNORED_NAMES = new Set([
@@ -210,6 +211,48 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
           hasDiff: result.diff.length > 0,
           ...(requestedPath ? { path: requestedPath } : {}),
           staged,
+          truncated: result.truncated,
+        };
+      },
+    },
+    {
+      name: 'run_command',
+      description:
+        'Run a small allowlist of project verification commands. No arbitrary shell commands or custom arguments.',
+      parameters: {
+        type: 'object',
+        properties: {
+          command: {
+            type: 'string',
+            enum: ['pnpm test', 'pnpm build', 'pnpm lint', 'git status --short'],
+            description: 'Allowlisted command to run.',
+          },
+          maxBytes: {
+            type: ['integer', 'null'],
+            description: 'Maximum stdout output bytes. Defaults to 96000 and caps at 200000.',
+          },
+        },
+        required: ['command', 'maxBytes'],
+        additionalProperties: false,
+      },
+      async execute(args) {
+        const command = getString(args, 'command');
+        const maxBytes = getOptionalInteger(
+          args,
+          'maxBytes',
+          DEFAULT_MAX_COMMAND_OUTPUT_BYTES,
+          1,
+          200_000,
+        );
+        const rootRealPath = await fs.realpath(projectRoot);
+        const result = await runAllowlistedCommand(command, rootRealPath, maxBytes);
+
+        return {
+          command,
+          exitCode: result.exitCode,
+          ok: result.exitCode === 0,
+          stdout: result.stdout,
+          stderr: result.stderr,
           truncated: result.truncated,
         };
       },
@@ -658,6 +701,37 @@ async function runGitDiff(options: {
     diff: output.stdout,
     truncated: output.truncated,
   };
+}
+
+async function runAllowlistedCommand(
+  command: string,
+  projectRoot: string,
+  maxBytes: number,
+): Promise<{ exitCode: number | null; stderr: string; stdout: string; truncated: boolean }> {
+  const commandSpec = resolveAllowedCommand(command);
+  if (!commandSpec) {
+    throw new Error(`Command is not allowlisted: ${command}`);
+  }
+
+  return collectProcessOutput(commandSpec.executable, commandSpec.args, {
+    cwd: projectRoot,
+    maxOutputBytes: maxBytes,
+  });
+}
+
+function resolveAllowedCommand(command: string): null | { args: string[]; executable: string } {
+  switch (command) {
+    case 'pnpm test':
+      return { executable: 'pnpm', args: ['test'] };
+    case 'pnpm build':
+      return { executable: 'pnpm', args: ['build'] };
+    case 'pnpm lint':
+      return { executable: 'pnpm', args: ['lint'] };
+    case 'git status --short':
+      return { executable: 'git', args: ['status', '--short'] };
+    default:
+      return null;
+  }
 }
 
 function parseRipgrepLine(projectRoot: string, line: string): SearchMatch | null {

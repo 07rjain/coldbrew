@@ -8,6 +8,7 @@ It uses the OpenAI Responses API with local function tools:
 - `list_tree`
 - `search_files`
 - `git_diff`
+- `run_command`
 - `read_file`
 - `read_many_files`
 - `write_file`
