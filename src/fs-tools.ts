@@ -9,6 +9,7 @@ const DEFAULT_MAX_READ_MANY_BYTES = 128_000;
 const DEFAULT_MAX_READ_MANY_FILES = 20;
 const DEFAULT_MAX_SEARCH_RESULTS = 50;
 const DEFAULT_MAX_SEARCH_OUTPUT_BYTES = 64_000;
+const DEFAULT_MAX_DIFF_BYTES = 96_000;
 const DEFAULT_IGNORED_NAMES = new Set([
   '.git',
   'coverage',
@@ -107,6 +108,57 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
           matchCount: result.matches.length,
           truncated: result.truncated,
           matches: result.matches,
+        };
+      },
+    },
+    {
+      name: 'git_diff',
+      description:
+        'Show the current Git diff for the project, optionally scoped to one project-relative path. Read-only.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: {
+            type: ['string', 'null'],
+            description: 'Optional project-relative file or directory to diff.',
+          },
+          staged: {
+            type: ['boolean', 'null'],
+            description: 'When true, show staged changes with git diff --cached. Defaults to false.',
+          },
+          maxBytes: {
+            type: ['integer', 'null'],
+            description: 'Maximum diff output bytes. Defaults to 96000 and caps at 200000.',
+          },
+        },
+        required: ['path', 'staged', 'maxBytes'],
+        additionalProperties: false,
+      },
+      async execute(args) {
+        const requestedPath = getOptionalString(args, 'path');
+        const staged = getOptionalBoolean(args, 'staged', false);
+        const maxBytes = getOptionalInteger(args, 'maxBytes', DEFAULT_MAX_DIFF_BYTES, 1, 200_000);
+        const rootRealPath = await fs.realpath(projectRoot);
+        let relativePath: string | undefined;
+
+        if (requestedPath) {
+          const absolutePath = await resolveInsideProject(projectRoot, requestedPath);
+          relativePath = path.relative(rootRealPath, absolutePath) || '.';
+        }
+
+        const result = await runGitDiff({
+          maxBytes,
+          projectRoot: rootRealPath,
+          relativePath,
+          staged,
+        });
+
+        return {
+          diff: result.diff,
+          hasDiff: result.diff.length > 0,
+          ...(requestedPath ? { path: requestedPath } : {}),
+          staged,
+          truncated: result.truncated,
         };
       },
     },
@@ -367,6 +419,36 @@ async function runRipgrep(options: {
   };
 }
 
+async function runGitDiff(options: {
+  maxBytes: number;
+  projectRoot: string;
+  relativePath?: string;
+  staged: boolean;
+}): Promise<{ diff: string; truncated: boolean }> {
+  const args = ['diff', '--no-ext-diff'];
+  if (options.staged) {
+    args.push('--cached');
+  }
+
+  if (options.relativePath) {
+    args.push('--', options.relativePath);
+  }
+
+  const output = await collectProcessOutput('git', args, {
+    cwd: options.projectRoot,
+    maxOutputBytes: options.maxBytes,
+  });
+
+  if (output.exitCode !== 0) {
+    throw new Error(output.stderr.trim() || `git diff exited with code ${output.exitCode}.`);
+  }
+
+  return {
+    diff: output.stdout,
+    truncated: output.truncated,
+  };
+}
+
 function parseRipgrepLine(projectRoot: string, line: string): SearchMatch | null {
   const firstColon = line.indexOf(':');
   if (firstColon === -1) {
@@ -473,6 +555,19 @@ function getOptionalInteger(
 
   if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) {
     throw new Error(`Expected optional argument "${key}" to be an integer between ${min} and ${max}.`);
+  }
+
+  return value;
+}
+
+function getOptionalBoolean(args: JsonObject, key: string, defaultValue: boolean): boolean {
+  const value = args[key];
+  if (value === undefined || value === null) {
+    return defaultValue;
+  }
+
+  if (typeof value !== 'boolean') {
+    throw new Error(`Expected optional argument "${key}" to be a boolean.`);
   }
 
   return value;

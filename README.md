@@ -6,6 +6,7 @@ It uses the OpenAI Responses API with local function tools:
 
 - `list_files`
 - `search_files`
+- `git_diff`
 - `read_file`
 - `read_many_files`
 - `edit_file`

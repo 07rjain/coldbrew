@@ -65,6 +65,7 @@ Filesystem tools are intentionally constrained:
 - Reads have a size limit.
 - Binary-looking files are rejected.
 - Search uses `rg` without a shell, with capped result count and output size.
+- Git diff uses `git diff` without a shell, with optional path scoping and capped output.
 - Common generated/vendor directories are hidden from `list_files`.
 - `edit_file` is dry-run by default.
 - Writes require `--allow-edits`.

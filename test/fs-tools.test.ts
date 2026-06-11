@@ -1,6 +1,8 @@
 import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
+import { promisify } from 'node:util';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -8,6 +10,7 @@ import { createFileTools, resolveInsideProject } from '../src/fs-tools.js';
 import type { ToolDefinition } from '../src/types.js';
 
 let tempDir: string;
+const execFileAsync = promisify(execFile);
 
 beforeEach(async () => {
   tempDir = await mkdtemp(path.join(os.tmpdir(), 'openai-agent-tools-'));
@@ -221,6 +224,57 @@ describe('filesystem tools', () => {
       ],
     });
   });
+
+  it('shows unstaged git diffs', async () => {
+    await initGitRepo(tempDir);
+    await writeFile(path.join(tempDir, 'tracked.txt'), 'before\n', 'utf8');
+    await execFileAsync('git', ['add', 'tracked.txt'], { cwd: tempDir });
+    await writeFile(path.join(tempDir, 'tracked.txt'), 'after\n', 'utf8');
+    const gitDiff = getTool(createFileTools({
+      allowEdits: false,
+      projectRoot: tempDir,
+    }), 'git_diff');
+
+    await expect(
+      gitDiff.execute({ path: null, staged: false, maxBytes: null }),
+    ).resolves.toMatchObject({
+      hasDiff: true,
+      staged: false,
+      truncated: false,
+      diff: expect.stringContaining('-before'),
+    });
+  });
+
+  it('shows staged git diffs scoped to a file', async () => {
+    await initGitRepo(tempDir);
+    await writeFile(path.join(tempDir, 'tracked.txt'), 'staged\n', 'utf8');
+    await execFileAsync('git', ['add', 'tracked.txt'], { cwd: tempDir });
+    const gitDiff = getTool(createFileTools({
+      allowEdits: false,
+      projectRoot: tempDir,
+    }), 'git_diff');
+
+    await expect(
+      gitDiff.execute({ path: 'tracked.txt', staged: true, maxBytes: null }),
+    ).resolves.toMatchObject({
+      hasDiff: true,
+      path: 'tracked.txt',
+      staged: true,
+      diff: expect.stringContaining('+staged'),
+    });
+  });
+
+  it('keeps git_diff paths inside the project root', async () => {
+    await initGitRepo(tempDir);
+    const gitDiff = getTool(createFileTools({
+      allowEdits: false,
+      projectRoot: tempDir,
+    }), 'git_diff');
+
+    await expect(
+      gitDiff.execute({ path: '../outside.txt', staged: false, maxBytes: null }),
+    ).rejects.toThrow('Path escapes project root');
+  });
 });
 
 function getTool(tools: ToolDefinition[], name: string): ToolDefinition {
@@ -230,4 +284,8 @@ function getTool(tools: ToolDefinition[], name: string): ToolDefinition {
   }
 
   return tool;
+}
+
+async function initGitRepo(dir: string): Promise<void> {
+  await execFileAsync('git', ['init'], { cwd: dir });
 }
