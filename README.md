@@ -2,9 +2,10 @@
 
 Coldbrew is a calm local coding-agent CLI inspired by Mihail Eric's article.
 
-It uses the OpenAI Responses API with three local function tools:
+It uses the OpenAI Responses API with local function tools:
 
 - `list_files`
+- `search_files`
 - `read_file`
 - `edit_file`
 
@@ -27,6 +28,12 @@ pnpm install:cli
 
 Set `OPENAI_API_KEY` in your environment or `.env`. Optionally set `OPENAI_MODEL`; the CLI defaults to `gpt-5.5`.
 
+Install `rg`/ripgrep for fast code search. On macOS:
+
+```bash
+brew install ripgrep
+```
+
 After installing the wrapper, the `coldbrew` command is available from your shell. The installer also provides `agent` as a convenience alias.
 
 By default `pnpm install:cli` writes small wrappers to `~/.local/bin/coldbrew` and `~/.local/bin/agent`. That directory is commonly on `PATH`. To choose another directory:
@@ -39,6 +46,7 @@ COLDBREW_BIN_DIR=/usr/local/bin pnpm install:cli
 
 ```bash
 coldbrew "List the files in this project"
+coldbrew "Search for createFileTools in src"
 coldbrew --allow-edits "Update README.md to mention dry-run edits"
 ```
 

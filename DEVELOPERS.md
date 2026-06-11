@@ -64,6 +64,7 @@ Filesystem tools are intentionally constrained:
 - Path escapes are rejected.
 - Reads have a size limit.
 - Binary-looking files are rejected.
+- Search uses `rg` without a shell, with capped result count and output size.
 - Common generated/vendor directories are hidden from `list_files`.
 - `edit_file` is dry-run by default.
 - Writes require `--allow-edits`.
@@ -100,6 +101,8 @@ Tests currently cover filesystem tool safety and edit behavior. New tools should
 - path or permission boundaries
 - dry-run behavior for writes
 - ambiguous edit prevention
+- capped search behavior
+- no-result search behavior
 
 ## OpenAI API Boundary
 

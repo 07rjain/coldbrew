@@ -1,9 +1,12 @@
 import { promises as fs } from 'node:fs';
+import { spawn } from 'node:child_process';
 import path from 'node:path';
 
 import type { JsonObject, JsonValue, ToolDefinition } from './types.js';
 
 const DEFAULT_MAX_READ_BYTES = 512_000;
+const DEFAULT_MAX_SEARCH_RESULTS = 50;
+const DEFAULT_MAX_SEARCH_OUTPUT_BYTES = 64_000;
 const DEFAULT_IGNORED_NAMES = new Set([
   '.git',
   'coverage',
@@ -50,6 +53,58 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
               type: entry.isDirectory() ? 'directory' : 'file',
             }))
             .sort((left, right) => left.name.localeCompare(right.name)),
+        };
+      },
+    },
+    {
+      name: 'search_files',
+      description:
+        'Search text files under the project root using ripgrep. Returns project-relative file, line, and text matches.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Literal or regex search query passed to rg.',
+          },
+          path: {
+            type: ['string', 'null'],
+            description: 'Project-relative file or directory to search. Defaults to ".".',
+          },
+          glob: {
+            type: ['string', 'null'],
+            description: 'Optional rg glob, such as "*.ts" or "src/**/*.ts".',
+          },
+          maxResults: {
+            type: ['integer', 'null'],
+            description: 'Maximum number of matches to return. Defaults to 50 and caps at 200.',
+          },
+        },
+        required: ['query', 'path', 'glob', 'maxResults'],
+        additionalProperties: false,
+      },
+      async execute(args) {
+        const query = getString(args, 'query');
+        const requestedPath = getOptionalString(args, 'path') ?? '.';
+        const glob = getOptionalString(args, 'glob');
+        const maxResults = getOptionalInteger(args, 'maxResults', DEFAULT_MAX_SEARCH_RESULTS, 1, 200);
+        const searchPath = await resolveInsideProject(projectRoot, requestedPath);
+        const rootRealPath = await fs.realpath(projectRoot);
+        const result = await runRipgrep({
+          glob,
+          maxResults,
+          projectRoot: rootRealPath,
+          query,
+          searchPath,
+        });
+
+        return {
+          query,
+          path: requestedPath,
+          ...(glob ? { glob } : {}),
+          matchCount: result.matches.length,
+          truncated: result.truncated,
+          matches: result.matches,
         };
       },
     },
@@ -171,10 +226,166 @@ export async function resolveInsideProject(projectRoot: string, requestedPath: s
   return finalPath;
 }
 
+interface SearchMatch extends JsonObject {
+  file: string;
+  line: number;
+  text: string;
+}
+
+async function runRipgrep(options: {
+  glob?: string;
+  maxResults: number;
+  projectRoot: string;
+  query: string;
+  searchPath: string;
+}): Promise<{ matches: SearchMatch[]; truncated: boolean }> {
+  const args = [
+    '--line-number',
+    '--no-heading',
+    '--color',
+    'never',
+    '--max-count',
+    String(options.maxResults + 1),
+    options.query,
+  ];
+
+  if (options.glob) {
+    args.push('--glob', options.glob);
+  }
+
+  args.push(options.searchPath);
+
+  const output = await collectProcessOutput('rg', args, {
+    cwd: options.projectRoot,
+    maxOutputBytes: DEFAULT_MAX_SEARCH_OUTPUT_BYTES,
+  });
+
+  if (output.exitCode === 1 && output.stdout.length === 0) {
+    return { matches: [], truncated: false };
+  }
+
+  if (output.exitCode !== 0 && output.exitCode !== 1) {
+    throw new Error(output.stderr.trim() || `rg exited with code ${output.exitCode}.`);
+  }
+
+  const matches = output.stdout
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => parseRipgrepLine(options.projectRoot, line))
+    .filter((match): match is SearchMatch => match !== null);
+
+  return {
+    matches: matches.slice(0, options.maxResults),
+    truncated: output.truncated || matches.length > options.maxResults,
+  };
+}
+
+function parseRipgrepLine(projectRoot: string, line: string): SearchMatch | null {
+  const firstColon = line.indexOf(':');
+  if (firstColon === -1) {
+    return null;
+  }
+
+  const secondColon = line.indexOf(':', firstColon + 1);
+  if (secondColon === -1) {
+    return null;
+  }
+
+  const absoluteFile = line.slice(0, firstColon);
+  const lineNumber = Number(line.slice(firstColon + 1, secondColon));
+  if (!Number.isInteger(lineNumber)) {
+    return null;
+  }
+
+  return {
+    file: path.relative(projectRoot, absoluteFile) || '.',
+    line: lineNumber,
+    text: line.slice(secondColon + 1),
+  };
+}
+
+function collectProcessOutput(
+  command: string,
+  args: string[],
+  options: { cwd: string; maxOutputBytes: number },
+): Promise<{ exitCode: number | null; stderr: string; stdout: string; truncated: boolean }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: options.cwd,
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    let truncated = false;
+
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+
+    child.stdout.on('data', (chunk: string) => {
+      if (stdout.length >= options.maxOutputBytes) {
+        truncated = true;
+        return;
+      }
+
+      stdout += chunk;
+      if (stdout.length > options.maxOutputBytes) {
+        stdout = stdout.slice(0, options.maxOutputBytes);
+        truncated = true;
+        child.kill('SIGTERM');
+      }
+    });
+
+    child.stderr.on('data', (chunk: string) => {
+      stderr += chunk;
+    });
+
+    child.on('error', (error) => {
+      reject(new Error(`Failed to run ${command}. Is ripgrep installed? ${error.message}`));
+    });
+
+    child.on('close', (exitCode) => {
+      resolve({ exitCode, stderr, stdout, truncated });
+    });
+  });
+}
+
 function getString(args: JsonObject, key: string): string {
   const value = args[key];
   if (typeof value !== 'string' || value.length === 0) {
     throw new Error(`Expected non-empty string argument "${key}".`);
+  }
+
+  return value;
+}
+
+function getOptionalString(args: JsonObject, key: string): string | undefined {
+  const value = args[key];
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(`Expected optional argument "${key}" to be a non-empty string.`);
+  }
+
+  return value;
+}
+
+function getOptionalInteger(
+  args: JsonObject,
+  key: string,
+  defaultValue: number,
+  min: number,
+  max: number,
+): number {
+  const value = args[key];
+  if (value === undefined || value === null) {
+    return defaultValue;
+  }
+
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) {
+    throw new Error(`Expected optional argument "${key}" to be an integer between ${min} and ${max}.`);
   }
 
   return value;
