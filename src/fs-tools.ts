@@ -5,6 +5,8 @@ import path from 'node:path';
 import type { JsonObject, JsonValue, ToolDefinition } from './types.js';
 
 const DEFAULT_MAX_READ_BYTES = 512_000;
+const DEFAULT_MAX_READ_MANY_BYTES = 128_000;
+const DEFAULT_MAX_READ_MANY_FILES = 20;
 const DEFAULT_MAX_SEARCH_RESULTS = 50;
 const DEFAULT_MAX_SEARCH_OUTPUT_BYTES = 64_000;
 const DEFAULT_IGNORED_NAMES = new Set([
@@ -124,26 +126,62 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
       },
       async execute(args) {
         const file = getString(args, 'file');
-        const filePath = await resolveInsideProject(projectRoot, file);
-        const stat = await fs.stat(filePath);
+        return readTextFile(projectRoot, file, maxReadBytes);
+      },
+    },
+    {
+      name: 'read_many_files',
+      description:
+        'Read multiple UTF-8 text files under the project root in one call. Returns per-file results and errors.',
+      parameters: {
+        type: 'object',
+        properties: {
+          files: {
+            type: 'array',
+            description: 'Project-relative file paths to read. Maximum 20 files.',
+            items: {
+              type: 'string',
+            },
+          },
+          maxBytesPerFile: {
+            type: ['integer', 'null'],
+            description:
+              'Optional per-file byte limit. Defaults to 128000 and caps at the configured read limit.',
+          },
+        },
+        required: ['files', 'maxBytesPerFile'],
+        additionalProperties: false,
+      },
+      async execute(args) {
+        const files = getStringArray(args, 'files', 1, DEFAULT_MAX_READ_MANY_FILES);
+        const requestedMaxBytes = getOptionalInteger(
+          args,
+          'maxBytesPerFile',
+          DEFAULT_MAX_READ_MANY_BYTES,
+          1,
+          maxReadBytes,
+        );
+        const results: FileReadManyResult[] = [];
 
-        if (!stat.isFile()) {
-          throw new Error(`${file} is not a file.`);
-        }
-
-        if (stat.size > maxReadBytes) {
-          throw new Error(`${file} is ${stat.size} bytes, above the ${maxReadBytes} byte limit.`);
-        }
-
-        const content = await fs.readFile(filePath, 'utf8');
-        if (content.includes('\u0000')) {
-          throw new Error(`${file} appears to be binary.`);
+        for (const file of files) {
+          try {
+            results.push({
+              ok: true,
+              ...(await readTextFile(projectRoot, file, requestedMaxBytes)),
+            });
+          } catch (error) {
+            results.push({
+              ok: false,
+              file,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
         }
 
         return {
-          file,
-          bytes: stat.size,
-          content,
+          count: results.length,
+          maxBytesPerFile: requestedMaxBytes,
+          results,
         };
       },
     },
@@ -230,6 +268,55 @@ interface SearchMatch extends JsonObject {
   file: string;
   line: number;
   text: string;
+}
+
+interface FileReadResult extends JsonObject {
+  bytes: number;
+  content: string;
+  file: string;
+}
+
+type FileReadManyResult = FileReadManySuccess | FileReadManyFailure;
+
+interface FileReadManySuccess extends JsonObject {
+  bytes: number;
+  content: string;
+  file: string;
+  ok: true;
+}
+
+interface FileReadManyFailure extends JsonObject {
+  error: string;
+  file: string;
+  ok: false;
+}
+
+async function readTextFile(
+  projectRoot: string,
+  file: string,
+  maxBytes: number,
+): Promise<FileReadResult> {
+  const filePath = await resolveInsideProject(projectRoot, file);
+  const stat = await fs.stat(filePath);
+
+  if (!stat.isFile()) {
+    throw new Error(`${file} is not a file.`);
+  }
+
+  if (stat.size > maxBytes) {
+    throw new Error(`${file} is ${stat.size} bytes, above the ${maxBytes} byte limit.`);
+  }
+
+  const content = await fs.readFile(filePath, 'utf8');
+  if (content.includes('\u0000')) {
+    throw new Error(`${file} appears to be binary.`);
+  }
+
+  return {
+    file,
+    bytes: stat.size,
+    content,
+  };
 }
 
 async function runRipgrep(options: {
@@ -389,6 +476,25 @@ function getOptionalInteger(
   }
 
   return value;
+}
+
+function getStringArray(args: JsonObject, key: string, minItems: number, maxItems: number): string[] {
+  const value = args[key];
+  if (!Array.isArray(value)) {
+    throw new Error(`Expected argument "${key}" to be an array.`);
+  }
+
+  if (value.length < minItems || value.length > maxItems) {
+    throw new Error(`Expected argument "${key}" to contain between ${minItems} and ${maxItems} items.`);
+  }
+
+  return value.map((item, index) => {
+    if (typeof item !== 'string' || item.length === 0) {
+      throw new Error(`Expected "${key}[${index}]" to be a non-empty string.`);
+    }
+
+    return item;
+  });
 }
 
 function countOccurrences(input: string, search: string): number {

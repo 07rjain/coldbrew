@@ -151,6 +151,76 @@ describe('filesystem tools', () => {
       'Path escapes project root',
     );
   });
+
+  it('reads multiple files in one tool call', async () => {
+    await writeFile(path.join(tempDir, 'a.txt'), 'alpha', 'utf8');
+    await writeFile(path.join(tempDir, 'b.txt'), 'beta', 'utf8');
+    const readManyFiles = getTool(createFileTools({
+      allowEdits: false,
+      projectRoot: tempDir,
+    }), 'read_many_files');
+
+    await expect(
+      readManyFiles.execute({ files: ['a.txt', 'b.txt'], maxBytesPerFile: null }),
+    ).resolves.toMatchObject({
+      count: 2,
+      results: [
+        { ok: true, file: 'a.txt', content: 'alpha' },
+        { ok: true, file: 'b.txt', content: 'beta' },
+      ],
+    });
+  });
+
+  it('returns per-file errors when read_many_files cannot read a file', async () => {
+    await writeFile(path.join(tempDir, 'a.txt'), 'alpha', 'utf8');
+    const readManyFiles = getTool(createFileTools({
+      allowEdits: false,
+      projectRoot: tempDir,
+    }), 'read_many_files');
+
+    await expect(
+      readManyFiles.execute({ files: ['a.txt', 'missing.txt'], maxBytesPerFile: null }),
+    ).resolves.toMatchObject({
+      count: 2,
+      results: [
+        { ok: true, file: 'a.txt', content: 'alpha' },
+        { ok: false, file: 'missing.txt' },
+      ],
+    });
+  });
+
+  it('enforces read_many_files item limit', async () => {
+    const readManyFiles = getTool(createFileTools({
+      allowEdits: false,
+      projectRoot: tempDir,
+    }), 'read_many_files');
+
+    await expect(
+      readManyFiles.execute({
+        files: Array.from({ length: 21 }, (_, index) => `${index}.txt`),
+        maxBytesPerFile: null,
+      }),
+    ).rejects.toThrow('between 1 and 20 items');
+  });
+
+  it('keeps read_many_files paths inside the project root', async () => {
+    const readManyFiles = getTool(createFileTools({
+      allowEdits: false,
+      projectRoot: tempDir,
+    }), 'read_many_files');
+
+    await expect(
+      readManyFiles.execute({ files: ['../outside.txt'], maxBytesPerFile: null }),
+    ).resolves.toMatchObject({
+      results: [
+        {
+          ok: false,
+          file: '../outside.txt',
+          error: expect.stringContaining('Path escapes project root'),
+        },
+      ],
+    });
+  });
 });
 
 function getTool(tools: ToolDefinition[], name: string): ToolDefinition {
