@@ -7,6 +7,7 @@ import type { JsonObject, JsonValue, ToolDefinition } from './types.js';
 const DEFAULT_MAX_READ_BYTES = 512_000;
 const DEFAULT_MAX_READ_MANY_BYTES = 128_000;
 const DEFAULT_MAX_READ_MANY_FILES = 20;
+const DEFAULT_MAX_WRITE_BYTES = 512_000;
 const DEFAULT_MAX_SEARCH_RESULTS = 50;
 const DEFAULT_MAX_SEARCH_OUTPUT_BYTES = 64_000;
 const DEFAULT_MAX_DIFF_BYTES = 96_000;
@@ -289,6 +290,75 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
       },
     },
     {
+      name: 'write_file',
+      description:
+        'Create or overwrite a UTF-8 text file under the project root. Dry-run unless edits are explicitly allowed.',
+      parameters: {
+        type: 'object',
+        properties: {
+          file: {
+            type: 'string',
+            description: 'Project-relative file path. Parent directory must already exist.',
+          },
+          content: {
+            type: 'string',
+            description: 'Full UTF-8 file content to write.',
+          },
+          overwrite: {
+            type: ['boolean', 'null'],
+            description: 'Set true to overwrite an existing file. Defaults to false.',
+          },
+        },
+        required: ['file', 'content', 'overwrite'],
+        additionalProperties: false,
+      },
+      async execute(args) {
+        const file = getString(args, 'file');
+        const content = getString(args, 'content', { allowEmpty: true });
+        const overwrite = getOptionalBoolean(args, 'overwrite', false);
+        const bytes = Buffer.byteLength(content, 'utf8');
+
+        if (bytes > DEFAULT_MAX_WRITE_BYTES) {
+          throw new Error(`${file} content is ${bytes} bytes, above the ${DEFAULT_MAX_WRITE_BYTES} byte limit.`);
+        }
+
+        if (content.includes('\u0000')) {
+          throw new Error(`${file} content appears to be binary.`);
+        }
+
+        const filePath = await resolveInsideProject(projectRoot, file);
+        const exists = await fileExists(filePath);
+        if (exists && !overwrite) {
+          return {
+            written: false,
+            dryRun: true,
+            file,
+            exists: true,
+            reason: 'File exists. Pass overwrite=true and run with --allow-edits to replace it.',
+          };
+        }
+
+        const result = {
+          written: options.allowEdits,
+          dryRun: !options.allowEdits,
+          file,
+          bytes,
+          exists,
+          overwrite,
+        };
+
+        if (!options.allowEdits) {
+          return {
+            ...result,
+            reason: 'Run with --allow-edits to write this file.',
+          };
+        }
+
+        await fs.writeFile(filePath, content, 'utf8');
+        return result;
+      },
+    },
+    {
       name: 'edit_file',
       description:
         'Replace exactly one occurrence of oldText with newText in an existing UTF-8 project file. Returns a dry-run result unless edits are explicitly allowed.',
@@ -495,6 +565,23 @@ async function readTextFile(
   };
 }
 
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.stat(filePath);
+    return true;
+  } catch (error) {
+    if (isNodeError(error) && error.code === 'ENOENT') {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && 'code' in error;
+}
+
 async function runRipgrep(options: {
   glob?: string;
   maxResults: number;
@@ -643,9 +730,9 @@ function collectProcessOutput(
   });
 }
 
-function getString(args: JsonObject, key: string): string {
+function getString(args: JsonObject, key: string, options: { allowEmpty?: boolean } = {}): string {
   const value = args[key];
-  if (typeof value !== 'string' || value.length === 0) {
+  if (typeof value !== 'string' || (!options.allowEmpty && value.length === 0)) {
     throw new Error(`Expected non-empty string argument "${key}".`);
   }
 

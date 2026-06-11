@@ -339,6 +339,82 @@ describe('filesystem tools', () => {
       listTree.execute({ dir: '../outside', maxDepth: 1, maxEntries: 20 }),
     ).rejects.toThrow('Path escapes project root');
   });
+
+  it('dry-runs write_file unless writes are allowed', async () => {
+    const writeFileTool = getTool(createFileTools({
+      allowEdits: false,
+      projectRoot: tempDir,
+    }), 'write_file');
+
+    await expect(
+      writeFileTool.execute({ file: 'new.txt', content: 'hello', overwrite: null }),
+    ).resolves.toMatchObject({
+      dryRun: true,
+      written: false,
+      file: 'new.txt',
+    });
+    await expect(readFile(path.join(tempDir, 'new.txt'), 'utf8')).rejects.toThrow();
+  });
+
+  it('writes new files when explicitly allowed', async () => {
+    const writeFileTool = getTool(createFileTools({
+      allowEdits: true,
+      projectRoot: tempDir,
+    }), 'write_file');
+
+    await expect(
+      writeFileTool.execute({ file: 'new.txt', content: 'hello', overwrite: null }),
+    ).resolves.toMatchObject({
+      written: true,
+      file: 'new.txt',
+      exists: false,
+    });
+    await expect(readFile(path.join(tempDir, 'new.txt'), 'utf8')).resolves.toBe('hello');
+  });
+
+  it('does not overwrite existing files unless overwrite is true', async () => {
+    await writeFile(path.join(tempDir, 'existing.txt'), 'old', 'utf8');
+    const writeFileTool = getTool(createFileTools({
+      allowEdits: true,
+      projectRoot: tempDir,
+    }), 'write_file');
+
+    await expect(
+      writeFileTool.execute({ file: 'existing.txt', content: 'new', overwrite: false }),
+    ).resolves.toMatchObject({
+      written: false,
+      exists: true,
+    });
+    await expect(readFile(path.join(tempDir, 'existing.txt'), 'utf8')).resolves.toBe('old');
+  });
+
+  it('overwrites existing files when explicitly allowed', async () => {
+    await writeFile(path.join(tempDir, 'existing.txt'), 'old', 'utf8');
+    const writeFileTool = getTool(createFileTools({
+      allowEdits: true,
+      projectRoot: tempDir,
+    }), 'write_file');
+
+    await expect(
+      writeFileTool.execute({ file: 'existing.txt', content: 'new', overwrite: true }),
+    ).resolves.toMatchObject({
+      written: true,
+      exists: true,
+      overwrite: true,
+    });
+    await expect(readFile(path.join(tempDir, 'existing.txt'), 'utf8')).resolves.toBe('new');
+  });
+
+  it('keeps write_file paths inside the project root', async () => {
+    const writeFileTool = getTool(createFileTools({
+      allowEdits: true,
+      projectRoot: tempDir,
+    }), 'write_file');
+
+    await expect(
+      writeFileTool.execute({ file: '../outside.txt', content: 'nope', overwrite: null }),
+    ).rejects.toThrow('Path escapes project root');
+  });
 });
 
 function getTool(tools: ToolDefinition[], name: string): ToolDefinition {

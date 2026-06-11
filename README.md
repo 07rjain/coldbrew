@@ -10,6 +10,7 @@ It uses the OpenAI Responses API with local function tools:
 - `git_diff`
 - `read_file`
 - `read_many_files`
+- `write_file`
 - `edit_file`
 
 Edits are dry-run by default. Pass `--allow-edits` to let `edit_file` write.

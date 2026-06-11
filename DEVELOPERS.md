@@ -69,6 +69,7 @@ Filesystem tools are intentionally constrained:
 - Tree listing is depth-limited, entry-limited, and skips generated/vendor directories.
 - Common generated/vendor directories are hidden from `list_files`.
 - `edit_file` is dry-run by default.
+- `write_file` is dry-run by default and refuses existing files unless `overwrite=true`.
 - Writes require `--allow-edits`.
 - `edit_file` only replaces text when `oldText` occurs exactly once.
 
