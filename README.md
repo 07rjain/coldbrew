@@ -13,6 +13,7 @@ It uses the OpenAI Responses API with local function tools:
 - `read_many_files`
 - `write_file`
 - `edit_file`
+- `apply_patch`
 
 Edits are dry-run by default. Pass `--allow-edits` to let `edit_file` write.
 

@@ -71,6 +71,7 @@ Filesystem tools are intentionally constrained:
 - Common generated/vendor directories are hidden from `list_files`.
 - `edit_file` is dry-run by default.
 - `write_file` is dry-run by default and refuses existing files unless `overwrite=true`.
+- `apply_patch` validates patch paths and runs `git apply --check`; applying requires `--allow-edits`.
 - Writes require `--allow-edits`.
 - `edit_file` only replaces text when `oldText` occurs exactly once.
 

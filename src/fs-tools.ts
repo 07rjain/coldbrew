@@ -12,6 +12,7 @@ const DEFAULT_MAX_SEARCH_RESULTS = 50;
 const DEFAULT_MAX_SEARCH_OUTPUT_BYTES = 64_000;
 const DEFAULT_MAX_DIFF_BYTES = 96_000;
 const DEFAULT_MAX_COMMAND_OUTPUT_BYTES = 96_000;
+const DEFAULT_MAX_PATCH_OUTPUT_BYTES = 96_000;
 const DEFAULT_TREE_DEPTH = 2;
 const DEFAULT_TREE_MAX_ENTRIES = 200;
 const DEFAULT_IGNORED_NAMES = new Set([
@@ -329,6 +330,88 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
           count: results.length,
           maxBytesPerFile: requestedMaxBytes,
           results,
+        };
+      },
+    },
+    {
+      name: 'apply_patch',
+      description:
+        'Validate or apply a unified diff patch under the project root. Dry-run unless edits are explicitly allowed.',
+      parameters: {
+        type: 'object',
+        properties: {
+          patch: {
+            type: 'string',
+            description: 'Unified diff patch to validate or apply.',
+          },
+          maxBytes: {
+            type: ['integer', 'null'],
+            description: 'Maximum command output bytes. Defaults to 96000 and caps at 200000.',
+          },
+        },
+        required: ['patch', 'maxBytes'],
+        additionalProperties: false,
+      },
+      async execute(args) {
+        const patch = getString(args, 'patch');
+        const maxBytes = getOptionalInteger(
+          args,
+          'maxBytes',
+          DEFAULT_MAX_PATCH_OUTPUT_BYTES,
+          1,
+          200_000,
+        );
+        const rootRealPath = await fs.realpath(projectRoot);
+        const touchedFiles = validateUnifiedPatchPaths(rootRealPath, patch);
+        const check = await runGitApply({
+          args: ['apply', '--check', '--whitespace=nowarn'],
+          maxBytes,
+          patch,
+          projectRoot: rootRealPath,
+        });
+
+        if (check.exitCode !== 0) {
+          return {
+            applied: false,
+            dryRun: true,
+            valid: false,
+            touchedFiles,
+            stdout: check.stdout,
+            stderr: check.stderr,
+            truncated: check.truncated,
+            reason: 'Patch did not apply cleanly.',
+          };
+        }
+
+        if (!options.allowEdits) {
+          return {
+            applied: false,
+            dryRun: true,
+            valid: true,
+            touchedFiles,
+            stdout: check.stdout,
+            stderr: check.stderr,
+            truncated: check.truncated,
+            reason: 'Run with --allow-edits to apply this patch.',
+          };
+        }
+
+        const apply = await runGitApply({
+          args: ['apply', '--whitespace=nowarn'],
+          maxBytes,
+          patch,
+          projectRoot: rootRealPath,
+        });
+
+        return {
+          applied: apply.exitCode === 0,
+          dryRun: false,
+          valid: apply.exitCode === 0,
+          touchedFiles,
+          stdout: apply.stdout,
+          stderr: apply.stderr,
+          truncated: apply.truncated,
+          reason: apply.exitCode === 0 ? 'Patch applied.' : 'Patch failed while applying.',
         };
       },
     },
@@ -719,6 +802,62 @@ async function runAllowlistedCommand(
   });
 }
 
+async function runGitApply(options: {
+  args: string[];
+  maxBytes: number;
+  patch: string;
+  projectRoot: string;
+}): Promise<{ exitCode: number | null; stderr: string; stdout: string; truncated: boolean }> {
+  return collectProcessOutput('git', options.args, {
+    cwd: options.projectRoot,
+    input: options.patch,
+    maxOutputBytes: options.maxBytes,
+  });
+}
+
+function validateUnifiedPatchPaths(projectRoot: string, patch: string): string[] {
+  const paths = new Set<string>();
+
+  for (const line of patch.split('\n')) {
+    if (line.startsWith('diff --git ')) {
+      const parts = line.split(/\s+/);
+      for (const part of parts.slice(2, 4)) {
+        addPatchPath(paths, projectRoot, part);
+      }
+      continue;
+    }
+
+    if (line.startsWith('--- ') || line.startsWith('+++ ')) {
+      const part = line.slice(4).split(/\s+/)[0] ?? '';
+      addPatchPath(paths, projectRoot, part);
+    }
+  }
+
+  if (paths.size === 0) {
+    throw new Error('Patch does not include any file paths.');
+  }
+
+  return [...paths].sort();
+}
+
+function addPatchPath(paths: Set<string>, projectRoot: string, rawPath: string): void {
+  if (!rawPath || rawPath === '/dev/null') {
+    return;
+  }
+
+  const normalized = rawPath.replace(/^"|"$/g, '').replace(/^[ab]\//, '');
+  if (normalized.startsWith('/') || normalized.length === 0) {
+    throw new Error(`Patch path escapes project root: ${rawPath}`);
+  }
+
+  const absolutePath = path.resolve(projectRoot, normalized);
+  if (absolutePath !== projectRoot && !absolutePath.startsWith(`${projectRoot}${path.sep}`)) {
+    throw new Error(`Patch path escapes project root: ${rawPath}`);
+  }
+
+  paths.add(normalized);
+}
+
 function resolveAllowedCommand(command: string): null | { args: string[]; executable: string } {
   switch (command) {
     case 'pnpm test':
@@ -761,22 +900,22 @@ function parseRipgrepLine(projectRoot: string, line: string): SearchMatch | null
 function collectProcessOutput(
   command: string,
   args: string[],
-  options: { cwd: string; maxOutputBytes: number },
+  options: { cwd: string; input?: string; maxOutputBytes: number },
 ): Promise<{ exitCode: number | null; stderr: string; stdout: string; truncated: boolean }> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: options.cwd,
       shell: false,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: [options.input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
     });
     let stdout = '';
     let stderr = '';
     let truncated = false;
 
-    child.stdout.setEncoding('utf8');
-    child.stderr.setEncoding('utf8');
+    child.stdout!.setEncoding('utf8');
+    child.stderr!.setEncoding('utf8');
 
-    child.stdout.on('data', (chunk: string) => {
+    child.stdout!.on('data', (chunk: string) => {
       if (stdout.length >= options.maxOutputBytes) {
         truncated = true;
         return;
@@ -790,9 +929,13 @@ function collectProcessOutput(
       }
     });
 
-    child.stderr.on('data', (chunk: string) => {
+    child.stderr!.on('data', (chunk: string) => {
       stderr += chunk;
     });
+
+    if (options.input !== undefined) {
+      child.stdin!.end(options.input);
+    }
 
     child.on('error', (error) => {
       reject(new Error(`Failed to run ${command}. Is ripgrep installed? ${error.message}`));

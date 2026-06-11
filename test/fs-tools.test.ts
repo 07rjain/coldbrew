@@ -445,6 +445,71 @@ describe('filesystem tools', () => {
       runCommand.execute({ command: 'rm -rf .', maxBytes: null }),
     ).rejects.toThrow('Command is not allowlisted');
   });
+
+  it('dry-runs valid patches unless edits are allowed', async () => {
+    await writeFile(path.join(tempDir, 'patch.txt'), 'old\n', 'utf8');
+    const applyPatch = getTool(createFileTools({
+      allowEdits: false,
+      projectRoot: tempDir,
+    }), 'apply_patch');
+
+    await expect(
+      applyPatch.execute({ patch: buildSimplePatch('patch.txt', 'old', 'new'), maxBytes: null }),
+    ).resolves.toMatchObject({
+      applied: false,
+      dryRun: true,
+      valid: true,
+      touchedFiles: ['patch.txt'],
+    });
+    await expect(readFile(path.join(tempDir, 'patch.txt'), 'utf8')).resolves.toBe('old\n');
+  });
+
+  it('applies valid patches when edits are allowed', async () => {
+    await writeFile(path.join(tempDir, 'patch.txt'), 'old\n', 'utf8');
+    const applyPatch = getTool(createFileTools({
+      allowEdits: true,
+      projectRoot: tempDir,
+    }), 'apply_patch');
+
+    await expect(
+      applyPatch.execute({ patch: buildSimplePatch('patch.txt', 'old', 'new'), maxBytes: null }),
+    ).resolves.toMatchObject({
+      applied: true,
+      dryRun: false,
+      valid: true,
+      touchedFiles: ['patch.txt'],
+    });
+    await expect(readFile(path.join(tempDir, 'patch.txt'), 'utf8')).resolves.toBe('new\n');
+  });
+
+  it('returns invalid for patches git cannot apply', async () => {
+    await writeFile(path.join(tempDir, 'patch.txt'), 'current\n', 'utf8');
+    const applyPatch = getTool(createFileTools({
+      allowEdits: true,
+      projectRoot: tempDir,
+    }), 'apply_patch');
+
+    await expect(
+      applyPatch.execute({ patch: buildSimplePatch('patch.txt', 'old', 'new'), maxBytes: null }),
+    ).resolves.toMatchObject({
+      applied: false,
+      dryRun: true,
+      valid: false,
+      touchedFiles: ['patch.txt'],
+    });
+    await expect(readFile(path.join(tempDir, 'patch.txt'), 'utf8')).resolves.toBe('current\n');
+  });
+
+  it('rejects patch paths outside the project root', async () => {
+    const applyPatch = getTool(createFileTools({
+      allowEdits: true,
+      projectRoot: tempDir,
+    }), 'apply_patch');
+
+    await expect(
+      applyPatch.execute({ patch: buildSimplePatch('../outside.txt', 'old', 'new'), maxBytes: null }),
+    ).rejects.toThrow('Patch path escapes project root');
+  });
 });
 
 function getTool(tools: ToolDefinition[], name: string): ToolDefinition {
@@ -458,4 +523,16 @@ function getTool(tools: ToolDefinition[], name: string): ToolDefinition {
 
 async function initGitRepo(dir: string): Promise<void> {
   await execFileAsync('git', ['init'], { cwd: dir });
+}
+
+function buildSimplePatch(file: string, oldText: string, newText: string): string {
+  return [
+    `diff --git a/${file} b/${file}`,
+    `--- a/${file}`,
+    `+++ b/${file}`,
+    '@@ -1 +1 @@',
+    `-${oldText}`,
+    `+${newText}`,
+    '',
+  ].join('\n');
 }
