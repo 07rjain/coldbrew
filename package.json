@@ -1,0 +1,55 @@
+{
+  "name": "coldbrew",
+  "version": "0.1.0",
+  "description": "A calm local coding agent CLI with OpenAI function calling and guarded filesystem tools.",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.22.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "coldbrew": "./dist/cli.js",
+    "agent": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "scripts",
+    "README.md",
+    "DEVELOPERS.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "CHANGELOG.md",
+    ".env.example",
+    "LICENSE",
+    "SECURITY.md"
+  ],
+  "keywords": [
+    "openai",
+    "agent",
+    "cli",
+    "coding-agent",
+    "coldbrew",
+    "responses-api",
+    "function-calling"
+  ],
+  "scripts": {
+    "coldbrew": "tsx src/cli.ts",
+    "agent": "tsx src/cli.ts",
+    "build": "tsc -p tsconfig.json",
+    "install:cli": "pnpm build && node scripts/install-agent-command.mjs",
+    "install:agent": "pnpm install:cli",
+    "link:global": "pnpm build && pnpm link --global",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "openai": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.2"
+  }
+}

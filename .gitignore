@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+coverage/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS/editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Local caches
+.turbo/
+.cache/
+tmp/
+
+# Local research notes not needed for the distributable project
+LLMlibrary_Analysis_Report.md
+mihail-eric-agent-llmlibrary-report.md
