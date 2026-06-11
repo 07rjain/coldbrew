@@ -5,6 +5,7 @@ Coldbrew is a calm local coding-agent CLI inspired by Mihail Eric's article.
 It uses the OpenAI Responses API with local function tools:
 
 - `list_files`
+- `list_tree`
 - `search_files`
 - `git_diff`
 - `read_file`

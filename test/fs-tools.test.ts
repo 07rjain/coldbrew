@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
@@ -273,6 +273,70 @@ describe('filesystem tools', () => {
 
     await expect(
       gitDiff.execute({ path: '../outside.txt', staged: false, maxBytes: null }),
+    ).rejects.toThrow('Path escapes project root');
+  });
+
+  it('lists a depth-limited project tree', async () => {
+    await mkdir(path.join(tempDir, 'src', 'nested'), { recursive: true });
+    await writeFile(path.join(tempDir, 'src', 'index.ts'), 'export {};\n', 'utf8');
+    await writeFile(path.join(tempDir, 'src', 'nested', 'deep.ts'), 'export {};\n', 'utf8');
+    const listTree = getTool(createFileTools({
+      allowEdits: false,
+      projectRoot: tempDir,
+    }), 'list_tree');
+
+    await expect(
+      listTree.execute({ dir: '.', maxDepth: 1, maxEntries: 20 }),
+    ).resolves.toMatchObject({
+      entryCount: 3,
+      entries: [
+        { path: 'src', type: 'directory', depth: 0 },
+        { path: 'src/nested', type: 'directory', depth: 1 },
+        { path: 'src/index.ts', type: 'file', depth: 1 },
+      ],
+      truncated: false,
+    });
+  });
+
+  it('hides ignored directories from list_tree', async () => {
+    await mkdir(path.join(tempDir, 'node_modules', 'pkg'), { recursive: true });
+    await mkdir(path.join(tempDir, 'src'), { recursive: true });
+    const listTree = getTool(createFileTools({
+      allowEdits: false,
+      projectRoot: tempDir,
+    }), 'list_tree');
+
+    await expect(
+      listTree.execute({ dir: '.', maxDepth: 2, maxEntries: 20 }),
+    ).resolves.toMatchObject({
+      entries: [{ path: 'src', type: 'directory', depth: 0 }],
+    });
+  });
+
+  it('truncates list_tree results at maxEntries', async () => {
+    await writeFile(path.join(tempDir, 'a.txt'), 'a', 'utf8');
+    await writeFile(path.join(tempDir, 'b.txt'), 'b', 'utf8');
+    const listTree = getTool(createFileTools({
+      allowEdits: false,
+      projectRoot: tempDir,
+    }), 'list_tree');
+
+    await expect(
+      listTree.execute({ dir: '.', maxDepth: 1, maxEntries: 1 }),
+    ).resolves.toMatchObject({
+      entryCount: 1,
+      truncated: true,
+    });
+  });
+
+  it('keeps list_tree paths inside the project root', async () => {
+    const listTree = getTool(createFileTools({
+      allowEdits: false,
+      projectRoot: tempDir,
+    }), 'list_tree');
+
+    await expect(
+      listTree.execute({ dir: '../outside', maxDepth: 1, maxEntries: 20 }),
     ).rejects.toThrow('Path escapes project root');
   });
 });

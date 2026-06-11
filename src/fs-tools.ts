@@ -10,6 +10,8 @@ const DEFAULT_MAX_READ_MANY_FILES = 20;
 const DEFAULT_MAX_SEARCH_RESULTS = 50;
 const DEFAULT_MAX_SEARCH_OUTPUT_BYTES = 64_000;
 const DEFAULT_MAX_DIFF_BYTES = 96_000;
+const DEFAULT_TREE_DEPTH = 2;
+const DEFAULT_TREE_MAX_ENTRIES = 200;
 const DEFAULT_IGNORED_NAMES = new Set([
   '.git',
   'coverage',
@@ -56,6 +58,55 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
               type: entry.isDirectory() ? 'directory' : 'file',
             }))
             .sort((left, right) => left.name.localeCompare(right.name)),
+        };
+      },
+    },
+    {
+      name: 'list_tree',
+      description:
+        'List a depth-limited project tree under a project-relative directory, skipping generated and vendor directories.',
+      parameters: {
+        type: 'object',
+        properties: {
+          dir: {
+            type: ['string', 'null'],
+            description: 'Project-relative directory path. Defaults to ".".',
+          },
+          maxDepth: {
+            type: ['integer', 'null'],
+            description: 'Maximum directory depth to recurse. Defaults to 2 and caps at 5.',
+          },
+          maxEntries: {
+            type: ['integer', 'null'],
+            description: 'Maximum entries to return. Defaults to 200 and caps at 1000.',
+          },
+        },
+        required: ['dir', 'maxDepth', 'maxEntries'],
+        additionalProperties: false,
+      },
+      async execute(args) {
+        const dir = getOptionalString(args, 'dir') ?? '.';
+        const maxDepth = getOptionalInteger(args, 'maxDepth', DEFAULT_TREE_DEPTH, 0, 5);
+        const maxEntries = getOptionalInteger(args, 'maxEntries', DEFAULT_TREE_MAX_ENTRIES, 1, 1000);
+        const rootRealPath = await fs.realpath(projectRoot);
+        const startPath = await resolveInsideProject(projectRoot, dir);
+        const result = await buildTreeEntries({
+          count: 0,
+          entries: [],
+          maxDepth,
+          maxEntries,
+          rootPath: rootRealPath,
+          startPath,
+          truncated: false,
+        });
+
+        return {
+          dir,
+          maxDepth,
+          maxEntries,
+          entryCount: result.entries.length,
+          truncated: result.truncated,
+          entries: result.entries,
         };
       },
     },
@@ -320,6 +371,79 @@ interface SearchMatch extends JsonObject {
   file: string;
   line: number;
   text: string;
+}
+
+interface TreeEntry extends JsonObject {
+  depth: number;
+  path: string;
+  type: string;
+}
+
+async function buildTreeEntries(state: {
+  count: number;
+  entries: TreeEntry[];
+  maxDepth: number;
+  maxEntries: number;
+  rootPath: string;
+  startPath: string;
+  truncated: boolean;
+}): Promise<{ entries: TreeEntry[]; truncated: boolean }> {
+  await visitTreeDirectory(state, state.startPath, 0);
+  return {
+    entries: state.entries,
+    truncated: state.truncated,
+  };
+}
+
+async function visitTreeDirectory(
+  state: {
+    count: number;
+    entries: TreeEntry[];
+    maxDepth: number;
+    maxEntries: number;
+    rootPath: string;
+    truncated: boolean;
+  },
+  dirPath: string,
+  depth: number,
+): Promise<void> {
+  if (state.truncated || depth > state.maxDepth) {
+    return;
+  }
+
+  const dirents = (await fs.readdir(dirPath, { withFileTypes: true }))
+    .filter((entry) => !DEFAULT_IGNORED_NAMES.has(entry.name))
+    .sort((left, right) => {
+      if (left.isDirectory() !== right.isDirectory()) {
+        return left.isDirectory() ? -1 : 1;
+      }
+
+      return left.name.localeCompare(right.name);
+    });
+
+  for (const dirent of dirents) {
+    if (state.count >= state.maxEntries) {
+      state.truncated = true;
+      return;
+    }
+
+    const absolutePath = path.join(dirPath, dirent.name);
+    const entry: TreeEntry = {
+      depth,
+      path: path.relative(state.rootPath, absolutePath) || '.',
+      type: dirent.isDirectory()
+        ? 'directory'
+        : dirent.isSymbolicLink()
+          ? 'symlink'
+          : 'file',
+    };
+    state.entries.push(entry);
+    state.count += 1;
+
+    if (dirent.isDirectory() && depth < state.maxDepth) {
+      await visitTreeDirectory(state, absolutePath, depth + 1);
+    }
+  }
 }
 
 interface FileReadResult extends JsonObject {
