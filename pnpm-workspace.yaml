@@ -1,0 +1,2 @@
+patchedDependencies:
+  unified-llm-client@0.1.0: patches/unified-llm-client@0.1.0.patch

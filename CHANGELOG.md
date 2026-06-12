@@ -7,5 +7,6 @@
 - Made write/edit/patch tools enabled by default, with `--dry-run` opt-out for previews.
 - Added interactive chat mode through the `coldbrew` command.
 - Switched interactive follow-up prompts to one LLMlibrary conversation.
+- Patched LLMlibrary's OpenAI adapter so assistant conversation history is serialized as `output_text` on follow-up turns.
 - Added interactive `:allow-edits`, `:dry-run`, `:status`, and `:clear` commands.
 - Added developer, contributing, and security documentation.

@@ -1,0 +1,88 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index 883e28c74ab005ca40fb138ffad031a9b94ce3cf..d7a1bd5d9cf798f0da244d613ca6c21fd2256d24 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -4376,7 +4376,7 @@ function translateOpenAIAssistantMessage(message) {
+         content: [
+           {
+             text: message.content,
+-            type: "input_text"
++            type: "output_text"
+           }
+         ],
+         role: "assistant",
+@@ -4402,7 +4402,7 @@ function translateOpenAIAssistantMessage(message) {
+       case "text":
+         textParts.push({
+           text: part.text,
+-          type: "input_text"
++          type: "output_text"
+         });
+         break;
+       case "tool_call":
+diff --git a/dist/index.js b/dist/index.js
+index d7984bdd6d299332e919347da6e9a701ebedf712..ca47823dc95c275933ca0a6839e823749fe9e3f5 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -4374,7 +4374,7 @@ function translateOpenAIAssistantMessage(message) {
+         content: [
+           {
+             text: message.content,
+-            type: "input_text"
++            type: "output_text"
+           }
+         ],
+         role: "assistant",
+@@ -4400,7 +4400,7 @@ function translateOpenAIAssistantMessage(message) {
+       case "text":
+         textParts.push({
+           text: part.text,
+-          type: "input_text"
++          type: "output_text"
+         });
+         break;
+       case "tool_call":
+diff --git a/dist/providers-openai.cjs b/dist/providers-openai.cjs
+index dbd57478f87a21c287b81c282f5cb67148e29734..850e4016936980296fbd003ab59db6e3c44844c0 100644
+--- a/dist/providers-openai.cjs
++++ b/dist/providers-openai.cjs
+@@ -1752,7 +1752,7 @@ function translateOpenAIAssistantMessage(message) {
+         content: [
+           {
+             text: message.content,
+-            type: "input_text"
++            type: "output_text"
+           }
+         ],
+         role: "assistant",
+@@ -1778,7 +1778,7 @@ function translateOpenAIAssistantMessage(message) {
+       case "text":
+         textParts.push({
+           text: part.text,
+-          type: "input_text"
++          type: "output_text"
+         });
+         break;
+       case "tool_call":
+diff --git a/dist/providers-openai.js b/dist/providers-openai.js
+index e2bb1223ba526c30694e38e7cdac62b14344539c..1684f3549e130f5af69c962ad3af86ce697628ee 100644
+--- a/dist/providers-openai.js
++++ b/dist/providers-openai.js
+@@ -1750,7 +1750,7 @@ function translateOpenAIAssistantMessage(message) {
+         content: [
+           {
+             text: message.content,
+-            type: "input_text"
++            type: "output_text"
+           }
+         ],
+         role: "assistant",
+@@ -1776,7 +1776,7 @@ function translateOpenAIAssistantMessage(message) {
+       case "text":
+         textParts.push({
+           text: part.text,
+-          type: "input_text"
++          type: "output_text"
+         });
+         break;
+       case "tool_call":
