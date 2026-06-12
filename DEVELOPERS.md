@@ -34,7 +34,7 @@ COLDBREW_BIN_DIR=/usr/local/bin pnpm install:cli
 coldbrew "List files in this project"
 coldbrew
 coldbrew --root /path/to/project "Inspect this repo"
-coldbrew --allow-edits "Update README.md"
+coldbrew --dry-run "Preview a README.md update"
 pnpm coldbrew "Run from source with tsx"
 ```
 
@@ -71,13 +71,13 @@ Filesystem tools are intentionally constrained:
 - Command execution is allowlisted to `pnpm test`, `pnpm build`, `pnpm lint`, and `git status --short`.
 - Tree listing is depth-limited, entry-limited, and skips generated/vendor directories.
 - Common generated/vendor directories are hidden from `list_files`.
-- `edit_file` is dry-run by default.
-- `write_file` is dry-run by default and refuses existing files unless `overwrite=true`.
-- `apply_patch` validates patch paths and runs `git apply --check`; applying requires `--allow-edits`.
-- Writes require `--allow-edits`.
+- `edit_file` supports dry-run mode.
+- `write_file` supports dry-run mode and refuses existing files unless `overwrite=true`.
+- `apply_patch` validates patch paths and runs `git apply --check`; applying is skipped in dry-run mode.
+- Writes are enabled by default; use `--dry-run` or `:dry-run` for previews.
 - `edit_file` only replaces text when `oldText` occurs exactly once.
 
-Interactive users can toggle write access for the current process with `:allow-edits` and return to dry-run mode with `:dry-run`.
+Interactive users can return to dry-run mode with `:dry-run` and re-enable write access with `:allow-edits`.
 
 This is not a full sandbox. Do not expand command execution, shell execution, or network tools without an explicit approval model and tests.
 
@@ -129,4 +129,4 @@ pnpm build
 coldbrew --help
 ```
 
-Also verify one read-only live task and one dry-run edit task.
+Also verify one write-capable live task and one dry-run edit task.

@@ -23,8 +23,8 @@ Include:
 - Path escapes are rejected.
 - Reads have a size limit.
 - Binary-looking files are rejected.
-- `edit_file` is dry-run by default.
-- Writes require `--allow-edits`.
+- Write/edit/patch tools are enabled by default.
+- Use `--dry-run` or `:dry-run` to preview write/edit/patch tools without changing files.
 - Arbitrary shell command execution is not available. `run_command` supports only a small hardcoded verification allowlist.
 
 These controls reduce risk but do not make this a full sandbox.

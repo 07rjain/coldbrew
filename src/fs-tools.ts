@@ -392,7 +392,7 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
             stdout: check.stdout,
             stderr: check.stderr,
             truncated: check.truncated,
-            reason: 'Run with --allow-edits to apply this patch.',
+            reason: 'Dry-run mode is enabled. Run without --dry-run, or use :allow-edits in interactive mode, to apply this patch.',
           };
         }
 
@@ -460,7 +460,7 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
             dryRun: true,
             file,
             exists: true,
-            reason: 'File exists. Pass overwrite=true and run with --allow-edits to replace it.',
+            reason: 'File exists. Pass overwrite=true to replace it.',
           };
         }
 
@@ -476,7 +476,7 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
         if (!options.allowEdits) {
           return {
             ...result,
-            reason: 'Run with --allow-edits to write this file.',
+            reason: 'Dry-run mode is enabled. Run without --dry-run, or use :allow-edits in interactive mode, to write this file.',
           };
         }
 
@@ -487,7 +487,7 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
     {
       name: 'edit_file',
       description:
-        'Replace exactly one occurrence of oldText with newText in an existing UTF-8 project file. Returns a dry-run result unless edits are explicitly allowed.',
+        'Replace exactly one occurrence of oldText with newText in an existing UTF-8 project file. Returns a dry-run result when dry-run mode is enabled.',
       parameters: {
         type: 'object',
         properties: {
@@ -538,7 +538,7 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
         if (!options.allowEdits) {
           return {
             ...result,
-            reason: 'Run with --allow-edits to write this change.',
+            reason: 'Dry-run mode is enabled. Run without --dry-run, or use :allow-edits in interactive mode, to write this change.',
           };
         }
 

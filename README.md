@@ -15,13 +15,13 @@ It uses the OpenAI Responses API with local function tools:
 - `edit_file`
 - `apply_patch`
 
-Edits are dry-run by default. Pass `--allow-edits` to let `edit_file` write.
+Write/edit/patch tools are enabled by default. Pass `--dry-run` to preview changes without writing.
 
 ## Safety
 
-This is a local coding-agent demo, not a full sandbox. It can read files under the configured project root, and it can edit files only when you pass `--allow-edits`.
+This is a local coding-agent demo, not a full sandbox. It can read and write files under the configured project root.
 
-The default mode is read-only/dry-run for edits.
+Use `--dry-run` when you want read-only previews.
 
 ## Setup
 
@@ -53,7 +53,7 @@ COLDBREW_BIN_DIR=/usr/local/bin pnpm install:cli
 ```bash
 coldbrew "List the files in this project"
 coldbrew "Search for createFileTools in src"
-coldbrew --allow-edits "Update README.md to mention dry-run edits"
+coldbrew --dry-run "Preview a README.md update"
 ```
 
 You can also run through pnpm during development:

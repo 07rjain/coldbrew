@@ -8,7 +8,7 @@ const DEFAULT_INSTRUCTIONS = [
   'Inspect files before editing them.',
   'Use project-relative paths.',
   'Do not claim a file was changed unless the edit_file tool reports edited=true.',
-  'When edit_file reports dryRun=true, explain the proposed change and ask the user to rerun with --allow-edits if they want it written.',
+  'When a write tool reports dryRun=true, explain the proposed change and tell the user to disable dry-run mode if they want it written.',
 ].join('\n');
 
 type ResponseItem = {

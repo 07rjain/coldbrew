@@ -49,7 +49,7 @@ async function runSingleTask(prompt: string, options: CliOptions): Promise<strin
 }
 
 function parseArgs(args: string[]): CliOptions {
-  let allowEdits = false;
+  let allowEdits = true;
   let interactive = false;
   let maxToolRounds = 6;
   let model = process.env.OPENAI_MODEL ?? 'gpt-5.5';
@@ -61,6 +61,11 @@ function parseArgs(args: string[]): CliOptions {
 
     if (arg === '--allow-edits') {
       allowEdits = true;
+      continue;
+    }
+
+    if (arg === '--dry-run') {
+      allowEdits = false;
       continue;
     }
 
@@ -123,7 +128,8 @@ function printHelp(): void {
        coldbrew --interactive
 
 Options:
-  --allow-edits              Allow edit_file to write changes. Defaults to dry-run.
+  --dry-run                  Preview write/edit/patch tools without changing files.
+  --allow-edits              Enable writes. This is the default; kept for compatibility.
   --interactive, -i          Keep the agent running for a chat-style session.
   --root <path>              Project root the tools may access. Defaults to cwd.
   --model <model>            OpenAI model. Defaults to OPENAI_MODEL or gpt-5.5.
@@ -132,10 +138,10 @@ Options:
 Examples:
   coldbrew "List the files in this project"
   coldbrew
-  > :allow-edits
+  > :dry-run
   > list the files in src
   > summarize README.md
-  coldbrew --allow-edits "Update README.md to mention the CLI"
+  coldbrew --dry-run "Preview a README.md update"
 `);
 }
 
