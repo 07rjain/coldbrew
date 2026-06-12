@@ -1,7 +1,16 @@
 diff --git a/dist/index.cjs b/dist/index.cjs
-index 883e28c74ab005ca40fb138ffad031a9b94ce3cf..d7a1bd5d9cf798f0da244d613ca6c21fd2256d24 100644
+index 883e28c74ab005ca40fb138ffad031a9b94ce3cf..807720681eef78b5e42f02e516dab3548677c0c1 100644
 --- a/dist/index.cjs
 +++ b/dist/index.cjs
+@@ -4041,7 +4041,7 @@ function translateOpenAIResponse(payload, modelRegistry = new ModelRegistry(), r
+       }
+       continue;
+     }
+-    if (isOpenAIFunctionCallOutput(item)) {
++    if (isCompleteOpenAIFunctionCallOutput(item)) {
+       const args = parseOpenAIToolArguments(
+         item.arguments,
+         payload.model,
 @@ -4376,7 +4376,7 @@ function translateOpenAIAssistantMessage(message) {
          content: [
            {
@@ -20,10 +29,42 @@ index 883e28c74ab005ca40fb138ffad031a9b94ce3cf..d7a1bd5d9cf798f0da244d613ca6c21f
          });
          break;
        case "tool_call":
+@@ -4443,6 +4443,9 @@ function parseOpenAIToolArguments(argumentsJson, model, toolName) {
+   }
+ }
+ function normalizeOpenAIFinishReason(payload) {
++  if (payload.status === "incomplete" || (payload.output ?? []).some(isIncompleteOpenAIFunctionCallOutput)) {
++    return "length";
++  }
+   if ((payload.output ?? []).some(isOpenAIFunctionCallOutput)) {
+     return "tool_call";
+   }
+@@ -4466,6 +4469,12 @@ function normalizeOpenAIFinishReason(payload) {
+ function isOpenAIFunctionCallOutput(item) {
+   return item.type === "function_call";
+ }
++function isCompleteOpenAIFunctionCallOutput(item) {
++  return isOpenAIFunctionCallOutput(item) && item.status !== "incomplete";
++}
++function isIncompleteOpenAIFunctionCallOutput(item) {
++  return isOpenAIFunctionCallOutput(item) && item.status === "incomplete";
++}
+ function isOpenAIMessageOutput(item) {
+   return item.type === "message";
+ }
 diff --git a/dist/index.js b/dist/index.js
-index d7984bdd6d299332e919347da6e9a701ebedf712..ca47823dc95c275933ca0a6839e823749fe9e3f5 100644
+index d7984bdd6d299332e919347da6e9a701ebedf712..ca161792e065f66f7ddc25e2a6fda5b1111cb115 100644
 --- a/dist/index.js
 +++ b/dist/index.js
+@@ -4039,7 +4039,7 @@ function translateOpenAIResponse(payload, modelRegistry = new ModelRegistry(), r
+       }
+       continue;
+     }
+-    if (isOpenAIFunctionCallOutput(item)) {
++    if (isCompleteOpenAIFunctionCallOutput(item)) {
+       const args = parseOpenAIToolArguments(
+         item.arguments,
+         payload.model,
 @@ -4374,7 +4374,7 @@ function translateOpenAIAssistantMessage(message) {
          content: [
            {
@@ -42,10 +83,42 @@ index d7984bdd6d299332e919347da6e9a701ebedf712..ca47823dc95c275933ca0a6839e82374
          });
          break;
        case "tool_call":
+@@ -4441,6 +4441,9 @@ function parseOpenAIToolArguments(argumentsJson, model, toolName) {
+   }
+ }
+ function normalizeOpenAIFinishReason(payload) {
++  if (payload.status === "incomplete" || (payload.output ?? []).some(isIncompleteOpenAIFunctionCallOutput)) {
++    return "length";
++  }
+   if ((payload.output ?? []).some(isOpenAIFunctionCallOutput)) {
+     return "tool_call";
+   }
+@@ -4464,6 +4467,12 @@ function normalizeOpenAIFinishReason(payload) {
+ function isOpenAIFunctionCallOutput(item) {
+   return item.type === "function_call";
+ }
++function isCompleteOpenAIFunctionCallOutput(item) {
++  return isOpenAIFunctionCallOutput(item) && item.status !== "incomplete";
++}
++function isIncompleteOpenAIFunctionCallOutput(item) {
++  return isOpenAIFunctionCallOutput(item) && item.status === "incomplete";
++}
+ function isOpenAIMessageOutput(item) {
+   return item.type === "message";
+ }
 diff --git a/dist/providers-openai.cjs b/dist/providers-openai.cjs
-index dbd57478f87a21c287b81c282f5cb67148e29734..850e4016936980296fbd003ab59db6e3c44844c0 100644
+index dbd57478f87a21c287b81c282f5cb67148e29734..629657a0a668b16b40a265a740c8beee80990828 100644
 --- a/dist/providers-openai.cjs
 +++ b/dist/providers-openai.cjs
+@@ -1417,7 +1417,7 @@ function translateOpenAIResponse(payload, modelRegistry = new ModelRegistry(), r
+       }
+       continue;
+     }
+-    if (isOpenAIFunctionCallOutput(item)) {
++    if (isCompleteOpenAIFunctionCallOutput(item)) {
+       const args = parseOpenAIToolArguments(
+         item.arguments,
+         payload.model,
 @@ -1752,7 +1752,7 @@ function translateOpenAIAssistantMessage(message) {
          content: [
            {
@@ -64,10 +137,42 @@ index dbd57478f87a21c287b81c282f5cb67148e29734..850e4016936980296fbd003ab59db6e3
          });
          break;
        case "tool_call":
+@@ -1819,6 +1819,9 @@ function parseOpenAIToolArguments(argumentsJson, model, toolName) {
+   }
+ }
+ function normalizeOpenAIFinishReason(payload) {
++  if (payload.status === "incomplete" || (payload.output ?? []).some(isIncompleteOpenAIFunctionCallOutput)) {
++    return "length";
++  }
+   if ((payload.output ?? []).some(isOpenAIFunctionCallOutput)) {
+     return "tool_call";
+   }
+@@ -1842,6 +1845,12 @@ function normalizeOpenAIFinishReason(payload) {
+ function isOpenAIFunctionCallOutput(item) {
+   return item.type === "function_call";
+ }
++function isCompleteOpenAIFunctionCallOutput(item) {
++  return isOpenAIFunctionCallOutput(item) && item.status !== "incomplete";
++}
++function isIncompleteOpenAIFunctionCallOutput(item) {
++  return isOpenAIFunctionCallOutput(item) && item.status === "incomplete";
++}
+ function isOpenAIMessageOutput(item) {
+   return item.type === "message";
+ }
 diff --git a/dist/providers-openai.js b/dist/providers-openai.js
-index e2bb1223ba526c30694e38e7cdac62b14344539c..1684f3549e130f5af69c962ad3af86ce697628ee 100644
+index e2bb1223ba526c30694e38e7cdac62b14344539c..72c52a126e2d31430458f03242b0e633caf0a5c4 100644
 --- a/dist/providers-openai.js
 +++ b/dist/providers-openai.js
+@@ -1415,7 +1415,7 @@ function translateOpenAIResponse(payload, modelRegistry = new ModelRegistry(), r
+       }
+       continue;
+     }
+-    if (isOpenAIFunctionCallOutput(item)) {
++    if (isCompleteOpenAIFunctionCallOutput(item)) {
+       const args = parseOpenAIToolArguments(
+         item.arguments,
+         payload.model,
 @@ -1750,7 +1750,7 @@ function translateOpenAIAssistantMessage(message) {
          content: [
            {
@@ -86,3 +191,26 @@ index e2bb1223ba526c30694e38e7cdac62b14344539c..1684f3549e130f5af69c962ad3af86ce
          });
          break;
        case "tool_call":
+@@ -1817,6 +1817,9 @@ function parseOpenAIToolArguments(argumentsJson, model, toolName) {
+   }
+ }
+ function normalizeOpenAIFinishReason(payload) {
++  if (payload.status === "incomplete" || (payload.output ?? []).some(isIncompleteOpenAIFunctionCallOutput)) {
++    return "length";
++  }
+   if ((payload.output ?? []).some(isOpenAIFunctionCallOutput)) {
+     return "tool_call";
+   }
+@@ -1840,6 +1843,12 @@ function normalizeOpenAIFinishReason(payload) {
+ function isOpenAIFunctionCallOutput(item) {
+   return item.type === "function_call";
+ }
++function isCompleteOpenAIFunctionCallOutput(item) {
++  return isOpenAIFunctionCallOutput(item) && item.status !== "incomplete";
++}
++function isIncompleteOpenAIFunctionCallOutput(item) {
++  return isOpenAIFunctionCallOutput(item) && item.status === "incomplete";
++}
+ function isOpenAIMessageOutput(item) {
+   return item.type === "message";
+ }

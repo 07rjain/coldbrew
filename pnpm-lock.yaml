@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   unified-llm-client@0.1.0:
-    hash: fb2dda2bac0a6141e7cca23fc0aade18b5a949377dd9885bede745c5bbdf4e4b
+    hash: 156f4cbda4e702df1c68a1fc3e8bf2f33bcbd3875339cb7c1ab229844e9019f6
     path: patches/unified-llm-client@0.1.0.patch
 
 importers:
@@ -18,7 +18,7 @@ importers:
         version: 16.6.1
       unified-llm-client:
         specifier: github:07rjain/LLMlibrary
-        version: https://codeload.github.com/07rjain/LLMlibrary/tar.gz/cf1da8edfeae3ebc90f2c01018f6061601ac925c(patch_hash=fb2dda2bac0a6141e7cca23fc0aade18b5a949377dd9885bede745c5bbdf4e4b)
+        version: https://codeload.github.com/07rjain/LLMlibrary/tar.gz/cf1da8edfeae3ebc90f2c01018f6061601ac925c(patch_hash=156f4cbda4e702df1c68a1fc3e8bf2f33bcbd3875339cb7c1ab229844e9019f6)
     devDependencies:
       '@types/node':
         specifier: ^22.15.3
@@ -1353,7 +1353,7 @@ snapshots:
 
   undici-types@6.21.0: {}
 
-  unified-llm-client@https://codeload.github.com/07rjain/LLMlibrary/tar.gz/cf1da8edfeae3ebc90f2c01018f6061601ac925c(patch_hash=fb2dda2bac0a6141e7cca23fc0aade18b5a949377dd9885bede745c5bbdf4e4b):
+  unified-llm-client@https://codeload.github.com/07rjain/LLMlibrary/tar.gz/cf1da8edfeae3ebc90f2c01018f6061601ac925c(patch_hash=156f4cbda4e702df1c68a1fc3e8bf2f33bcbd3875339cb7c1ab229844e9019f6):
     dependencies:
       js-tiktoken: 1.0.21
       pg: 8.21.0

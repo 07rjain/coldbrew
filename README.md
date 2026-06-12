@@ -54,6 +54,7 @@ COLDBREW_BIN_DIR=/usr/local/bin pnpm install:cli
 coldbrew "List the files in this project"
 coldbrew "Search for createFileTools in src"
 coldbrew --dry-run "Preview a README.md update"
+coldbrew --max-output-tokens 24000 "Create a single-file HTML game"
 ```
 
 You can also run through pnpm during development:
@@ -83,6 +84,8 @@ exit
 ```
 
 Each line is sent to the same LLMlibrary conversation, so follow-up requests can refer to prior turns. Type `exit`, `quit`, or `:q` to close the session.
+
+Coldbrew defaults to `16000` output tokens per model turn so file-writing tool calls have room to include complete file contents. Use `--max-output-tokens <n>` for unusually large generated files.
 
 Interactive commands:
 

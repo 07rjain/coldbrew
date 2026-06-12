@@ -46,6 +46,7 @@ export async function createCodingAgentSession(options: AgentOptions): Promise<C
       maxMessages: 30,
       maxTokens: 64_000,
     }),
+    maxTokens: options.maxOutputTokens,
     maxToolRounds: options.maxToolRounds,
     model: options.model,
     system: options.instructions ?? DEFAULT_INSTRUCTIONS,

@@ -8,5 +8,7 @@
 - Added interactive chat mode through the `coldbrew` command.
 - Switched interactive follow-up prompts to one LLMlibrary conversation.
 - Patched LLMlibrary's OpenAI adapter so assistant conversation history is serialized as `output_text` on follow-up turns.
+- Raised the default model output budget to `16000` tokens and added `--max-output-tokens` for larger file-generation tasks.
+- Patched incomplete OpenAI function calls so truncated `write_file` arguments do not crash the CLI.
 - Added interactive `:allow-edits`, `:dry-run`, `:status`, and `:clear` commands.
 - Added developer, contributing, and security documentation.

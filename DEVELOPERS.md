@@ -119,6 +119,13 @@ Tests currently cover filesystem tool safety and edit behavior. New tools should
 
 Model switching is controlled by `--model` or `OPENAI_MODEL`. LLMlibrary's model registry is used when the model is known; Coldbrew registers an OpenAI-compatible fallback for unknown model IDs so model sweeps can still run.
 
+Coldbrew passes `maxTokens` into the LLMlibrary conversation and defaults it to `16000`. This is intentionally higher than LLMlibrary's generic client default because coding-agent tool calls often need to carry complete file contents in `write_file` arguments.
+
+The repository also carries a pnpm patch for `unified-llm-client` until the upstream package includes the same OpenAI adapter fixes:
+
+- assistant history text is serialized as `output_text`
+- incomplete OpenAI function calls are treated as `length` finishes instead of parsing truncated JSON arguments
+
 ## Release Notes For Maintainers
 
 Before publishing or tagging:

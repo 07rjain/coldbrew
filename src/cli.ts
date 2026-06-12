@@ -12,6 +12,7 @@ import type { AgentEvent, JsonObject } from './types.js';
 interface CliOptions {
   allowEdits: boolean;
   interactive: boolean;
+  maxOutputTokens: number;
   maxToolRounds: number;
   model: string;
   prompt?: string;
@@ -50,6 +51,7 @@ async function runSingleTask(prompt: string, options: CliOptions): Promise<strin
 function parseArgs(args: string[]): CliOptions {
   let allowEdits = true;
   let interactive = false;
+  let maxOutputTokens = 16_000;
   let maxToolRounds = 6;
   let model = process.env.OPENAI_MODEL ?? 'gpt-5.4';
   let projectRoot = process.cwd();
@@ -91,6 +93,14 @@ function parseArgs(args: string[]): CliOptions {
       continue;
     }
 
+    if (arg === '--max-output-tokens') {
+      maxOutputTokens = Number(readOptionValue(args, ++index, '--max-output-tokens'));
+      if (!Number.isInteger(maxOutputTokens) || maxOutputTokens <= 0) {
+        throw new Error('--max-output-tokens must be a positive integer.');
+      }
+      continue;
+    }
+
     if (arg === '--help' || arg === '-h') {
       printHelp();
       process.exit(0);
@@ -105,6 +115,7 @@ function parseArgs(args: string[]): CliOptions {
   return {
     allowEdits,
     interactive,
+    maxOutputTokens,
     maxToolRounds,
     model,
     projectRoot,
@@ -133,6 +144,7 @@ Options:
   --root <path>              Project root the tools may access. Defaults to cwd.
   --model <model>            Model id. Defaults to OPENAI_MODEL or gpt-5.4.
   --max-tool-rounds <count>  Maximum model/tool loop rounds. Defaults to 6.
+  --max-output-tokens <n>    Maximum model output tokens per turn. Defaults to 16000.
 
 Examples:
   coldbrew "List the files in this project"
@@ -224,6 +236,7 @@ ${style.bold}Listening${style.reset}
   root: ${options.projectRoot}
   mode: ${editMode}
   max tool rounds: ${options.maxToolRounds}
+  max output tokens: ${options.maxOutputTokens}
 
 Type a message and press Enter.
 Commands: ${style.bold}:status${style.reset}, ${style.bold}:allow-edits${style.reset}, ${style.bold}:dry-run${style.reset}, ${style.bold}:clear${style.reset}
@@ -259,6 +272,7 @@ ${style.bold}Run${style.reset}
   root: ${options.projectRoot}
   mode: ${editMode}
   max tool rounds: ${options.maxToolRounds}
+  max output tokens: ${options.maxOutputTokens}
 
 ${style.bold}Agent Activity${style.reset}
 `);

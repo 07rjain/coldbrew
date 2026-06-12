@@ -6,6 +6,7 @@ export type ToolDefinition = CanonicalTool;
 export interface AgentOptions {
   allowEdits: boolean;
   instructions?: string;
+  maxOutputTokens: number;
   maxToolRounds: number;
   model: string;
   onEvent?: (event: AgentEvent) => void;
