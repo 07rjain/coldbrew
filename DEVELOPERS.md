@@ -56,6 +56,8 @@ The loop is:
 5. The host sends `function_call_output` back to the model.
 6. The loop repeats until the model returns text with no tool calls.
 
+Interactive mode keeps a bounded text transcript of recent user and assistant turns so follow-up prompts can refer to prior answers. It does not persist memory after the process exits.
+
 ## Safety Model
 
 Filesystem tools are intentionally constrained:
@@ -74,6 +76,8 @@ Filesystem tools are intentionally constrained:
 - `apply_patch` validates patch paths and runs `git apply --check`; applying requires `--allow-edits`.
 - Writes require `--allow-edits`.
 - `edit_file` only replaces text when `oldText` occurs exactly once.
+
+Interactive users can toggle write access for the current process with `:allow-edits` and return to dry-run mode with `:dry-run`.
 
 This is not a full sandbox. Do not expand command execution, shell execution, or network tools without an explicit approval model and tests.
 

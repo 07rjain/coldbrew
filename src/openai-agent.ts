@@ -34,6 +34,10 @@ export async function runOpenAICodingAgent(prompt: string, options: AgentOptions
   const toolsByName = new Map(toolDefinitions.map((tool) => [tool.name, tool]));
   const tools = toolDefinitions.map(toOpenAITool);
   const input: Array<Record<string, unknown>> = [
+    ...(options.history ?? []).map((message) => ({
+      role: message.role,
+      content: message.content,
+    })),
     {
       role: 'user',
       content: prompt,

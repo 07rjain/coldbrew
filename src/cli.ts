@@ -7,10 +7,11 @@ import { createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 
 import { runOpenAICodingAgent } from './openai-agent.js';
-import type { AgentEvent, JsonObject } from './types.js';
+import type { AgentEvent, ConversationMessage, JsonObject } from './types.js';
 
 interface CliOptions {
   allowEdits: boolean;
+  history?: ConversationMessage[];
   interactive: boolean;
   maxToolRounds: number;
   model: string;
@@ -34,7 +35,7 @@ async function main(): Promise<void> {
   await runSingleTask(requirePrompt(options.prompt), options);
 }
 
-async function runSingleTask(prompt: string, options: CliOptions): Promise<void> {
+async function runSingleTask(prompt: string, options: CliOptions): Promise<string> {
   printRunConfig(prompt, options);
 
   const startedAt = Date.now();
@@ -44,6 +45,7 @@ async function runSingleTask(prompt: string, options: CliOptions): Promise<void>
   });
 
   printFinalResponse(response, Date.now() - startedAt);
+  return response;
 }
 
 function parseArgs(args: string[]): CliOptions {
@@ -130,6 +132,7 @@ Options:
 Examples:
   coldbrew "List the files in this project"
   coldbrew
+  > :allow-edits
   > list the files in src
   > summarize README.md
   coldbrew --allow-edits "Update README.md to mention the CLI"
@@ -150,6 +153,7 @@ ${style.reset}
 async function runInteractive(options: CliOptions): Promise<void> {
   printInteractiveConfig(options);
   const rl = createInterface({ input, output });
+  const history: ConversationMessage[] = [];
 
   try {
     while (true) {
@@ -163,10 +167,53 @@ async function runInteractive(options: CliOptions): Promise<void> {
         return;
       }
 
-      await runSingleTask(line, options);
+      if (handleInteractiveCommand(line, options, history)) {
+        continue;
+      }
+
+      const response = await runSingleTask(line, {
+        ...options,
+        history,
+      });
+      history.push({ role: 'user', content: line }, { role: 'assistant', content: response });
+      trimHistory(history);
     }
   } finally {
     rl.close();
+  }
+}
+
+function handleInteractiveCommand(
+  line: string,
+  options: CliOptions,
+  history: ConversationMessage[],
+): boolean {
+  switch (line.toLowerCase()) {
+    case ':status':
+      printInteractiveConfig(options);
+      process.stdout.write(`${style.dim}memory turns: ${Math.floor(history.length / 2)}${style.reset}\n\n`);
+      return true;
+    case ':allow-edits':
+      options.allowEdits = true;
+      process.stdout.write(`${style.warning}writes enabled for this session${style.reset}\n`);
+      return true;
+    case ':dry-run':
+      options.allowEdits = false;
+      process.stdout.write(`${style.ok}dry-run edits enabled${style.reset}\n`);
+      return true;
+    case ':clear':
+      history.length = 0;
+      process.stdout.write('conversation memory cleared\n');
+      return true;
+    default:
+      return false;
+  }
+}
+
+function trimHistory(history: ConversationMessage[]): void {
+  const maxMessages = 20;
+  if (history.length > maxMessages) {
+    history.splice(0, history.length - maxMessages);
   }
 }
 
@@ -183,6 +230,7 @@ ${style.bold}Listening${style.reset}
   max tool rounds: ${options.maxToolRounds}
 
 Type a message and press Enter.
+Commands: ${style.bold}:status${style.reset}, ${style.bold}:allow-edits${style.reset}, ${style.bold}:dry-run${style.reset}, ${style.bold}:clear${style.reset}
 Type ${style.bold}exit${style.reset} to quit.
 
 `);

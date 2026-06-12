@@ -77,10 +77,19 @@ Then type normally:
 ```text
 list the files in src
 summarize README.md
+:allow-edits
+create the file we discussed
 exit
 ```
 
-Each line is sent to the agent as a new task. Type `exit`, `quit`, or `:q` to close the session.
+Each line is sent to the agent as a new task, and the session keeps recent conversation memory for follow-up requests. Type `exit`, `quit`, or `:q` to close the session.
+
+Interactive commands:
+
+- `:status` - show current model/root/edit mode and memory count
+- `:allow-edits` - enable writes for the current session
+- `:dry-run` - return to dry-run edit mode
+- `:clear` - clear conversation memory
 
 ## Verify
 

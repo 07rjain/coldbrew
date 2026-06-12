@@ -14,11 +14,17 @@ export interface ToolDefinition {
 
 export interface AgentOptions {
   allowEdits: boolean;
+  history?: ConversationMessage[];
   instructions?: string;
   maxToolRounds: number;
   model: string;
   onEvent?: (event: AgentEvent) => void;
   projectRoot: string;
+}
+
+export interface ConversationMessage {
+  content: string;
+  role: 'assistant' | 'user';
 }
 
 export type AgentEvent =
