@@ -1,6 +1,6 @@
 # Coldbrew Developer Guide
 
-This project is a small OpenAI-first coding agent CLI. It is intentionally simple: the model can ask for local function tools, the host process executes those tools, and tool results are sent back to the model until the model returns a final answer.
+This project is a small LLMlibrary-backed coding agent CLI. It is intentionally simple: the model can ask for local function tools, LLMlibrary manages the conversation/tool loop, and Coldbrew executes guarded local tools.
 
 ## Local Setup
 
@@ -43,7 +43,7 @@ pnpm coldbrew "Run from source with tsx"
 Main modules:
 
 - `src/cli.ts`: command-line interface, banner, interactive chat mode, argument parsing, progress rendering.
-- `src/openai-agent.ts`: OpenAI Responses API loop, function-call dispatch, tool-result feedback.
+- `src/openai-agent.ts`: LLMlibrary client/session setup, conversation creation, model registration fallback, and tool instrumentation.
 - `src/fs-tools.ts`: local filesystem tools and path safety checks.
 - `src/types.ts`: shared JSON, tool, agent option, and progress event types.
 
@@ -51,12 +51,12 @@ The loop is:
 
 1. User enters a task.
 2. CLI calls `runOpenAICodingAgent()`.
-3. OpenAI receives the prompt and available function tools.
-4. If the model returns `function_call`, the host executes the matching local tool.
-5. The host sends `function_call_output` back to the model.
+3. LLMlibrary sends the prompt and available canonical tools to the selected provider.
+4. If the model returns a tool call, LLMlibrary dispatches the matching local tool.
+5. LLMlibrary appends the tool result and continues the model/tool loop.
 6. The loop repeats until the model returns text with no tool calls.
 
-Interactive mode keeps a bounded text transcript of recent user and assistant turns so follow-up prompts can refer to prior answers. It does not persist memory after the process exits.
+Interactive mode keeps one LLMlibrary `Conversation` alive so follow-up prompts can refer to prior turns. It does not persist memory after the process exits.
 
 ## Safety Model
 
@@ -115,9 +115,9 @@ Tests currently cover filesystem tool safety and edit behavior. New tools should
 
 ## OpenAI API Boundary
 
-`src/openai-agent.ts` uses the Responses API function-calling flow. The SDK's generated TypeScript unions can be narrower than the dynamic response item array we maintain locally, so casts are isolated at the `client.responses.create()` boundary.
+`src/openai-agent.ts` uses `LLMClient.fromEnv()` and `client.conversation()` from `unified-llm-client`. Tools are declared with LLMlibrary's `defineTool()` helper in `src/fs-tools.ts`.
 
-Keep provider-specific code in `openai-agent.ts`. This makes it easier to add an LLMlibrary-backed runtime later without rewriting CLI and tool code.
+Model switching is controlled by `--model` or `OPENAI_MODEL`. LLMlibrary's model registry is used when the model is known; Coldbrew registers an OpenAI-compatible fallback for unknown model IDs so model sweeps can still run.
 
 ## Release Notes For Maintainers
 

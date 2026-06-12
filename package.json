@@ -1,7 +1,7 @@
 {
   "name": "coldbrew",
   "version": "0.1.0",
-  "description": "A calm local coding agent CLI with OpenAI function calling and guarded filesystem tools.",
+  "description": "A calm local coding agent CLI powered by LLMlibrary conversations and guarded filesystem tools.",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.22.0",
@@ -30,7 +30,8 @@
     "cli",
     "coding-agent",
     "coldbrew",
-    "responses-api",
+    "llmlibrary",
+    "unified-llm-client",
     "function-calling"
   ],
   "scripts": {
@@ -44,7 +45,7 @@
   },
   "dependencies": {
     "dotenv": "^16.4.7",
-    "openai": "^5.0.0"
+    "unified-llm-client": "github:07rjain/LLMlibrary"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",

@@ -1,30 +1,15 @@
-export type JsonPrimitive = boolean | null | number | string;
-export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+import type { CanonicalTool, JsonObject, JsonValue } from 'unified-llm-client';
 
-export interface JsonObject {
-  [key: string]: JsonValue;
-}
-
-export interface ToolDefinition {
-  name: string;
-  description: string;
-  parameters: JsonObject;
-  execute(args: JsonObject): Promise<JsonValue>;
-}
+export type { JsonObject, JsonValue };
+export type ToolDefinition = CanonicalTool;
 
 export interface AgentOptions {
   allowEdits: boolean;
-  history?: ConversationMessage[];
   instructions?: string;
   maxToolRounds: number;
   model: string;
   onEvent?: (event: AgentEvent) => void;
   projectRoot: string;
-}
-
-export interface ConversationMessage {
-  content: string;
-  role: 'assistant' | 'user';
 }
 
 export type AgentEvent =

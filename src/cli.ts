@@ -6,12 +6,11 @@ import process from 'node:process';
 import { createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 
-import { runOpenAICodingAgent } from './openai-agent.js';
-import type { AgentEvent, ConversationMessage, JsonObject } from './types.js';
+import { createCodingAgentSession, runOpenAICodingAgent, type CodingAgentSession } from './openai-agent.js';
+import type { AgentEvent, JsonObject } from './types.js';
 
 interface CliOptions {
   allowEdits: boolean;
-  history?: ConversationMessage[];
   interactive: boolean;
   maxToolRounds: number;
   model: string;
@@ -52,7 +51,7 @@ function parseArgs(args: string[]): CliOptions {
   let allowEdits = true;
   let interactive = false;
   let maxToolRounds = 6;
-  let model = process.env.OPENAI_MODEL ?? 'gpt-5.5';
+  let model = process.env.OPENAI_MODEL ?? 'gpt-5.4';
   let projectRoot = process.cwd();
   const promptParts: string[] = [];
 
@@ -132,7 +131,7 @@ Options:
   --allow-edits              Enable writes. This is the default; kept for compatibility.
   --interactive, -i          Keep the agent running for a chat-style session.
   --root <path>              Project root the tools may access. Defaults to cwd.
-  --model <model>            OpenAI model. Defaults to OPENAI_MODEL or gpt-5.5.
+  --model <model>            Model id. Defaults to OPENAI_MODEL or gpt-5.4.
   --max-tool-rounds <count>  Maximum model/tool loop rounds. Defaults to 6.
 
 Examples:
@@ -159,7 +158,10 @@ ${style.reset}
 async function runInteractive(options: CliOptions): Promise<void> {
   printInteractiveConfig(options);
   const rl = createInterface({ input, output });
-  const history: ConversationMessage[] = [];
+  const session = await createCodingAgentSession({
+    ...options,
+    onEvent: renderAgentEvent,
+  });
 
   try {
     while (true) {
@@ -173,16 +175,11 @@ async function runInteractive(options: CliOptions): Promise<void> {
         return;
       }
 
-      if (handleInteractiveCommand(line, options, history)) {
+      if (handleInteractiveCommand(line, options, session)) {
         continue;
       }
 
-      const response = await runSingleTask(line, {
-        ...options,
-        history,
-      });
-      history.push({ role: 'user', content: line }, { role: 'assistant', content: response });
-      trimHistory(history);
+      await runSessionTask(line, options, session);
     }
   } finally {
     rl.close();
@@ -192,12 +189,12 @@ async function runInteractive(options: CliOptions): Promise<void> {
 function handleInteractiveCommand(
   line: string,
   options: CliOptions,
-  history: ConversationMessage[],
+  session: CodingAgentSession,
 ): boolean {
   switch (line.toLowerCase()) {
     case ':status':
       printInteractiveConfig(options);
-      process.stdout.write(`${style.dim}memory turns: ${Math.floor(history.length / 2)}${style.reset}\n\n`);
+      process.stdout.write(`${style.dim}conversation messages: ${session.messageCount()}${style.reset}\n\n`);
       return true;
     case ':allow-edits':
       options.allowEdits = true;
@@ -208,18 +205,11 @@ function handleInteractiveCommand(
       process.stdout.write(`${style.ok}dry-run edits enabled${style.reset}\n`);
       return true;
     case ':clear':
-      history.length = 0;
+      session.clear();
       process.stdout.write('conversation memory cleared\n');
       return true;
     default:
       return false;
-  }
-}
-
-function trimHistory(history: ConversationMessage[]): void {
-  const maxMessages = 20;
-  if (history.length > maxMessages) {
-    history.splice(0, history.length - maxMessages);
   }
 }
 
@@ -240,6 +230,19 @@ Commands: ${style.bold}:status${style.reset}, ${style.bold}:allow-edits${style.r
 Type ${style.bold}exit${style.reset} to quit.
 
 `);
+}
+
+async function runSessionTask(
+  prompt: string,
+  options: CliOptions,
+  session: CodingAgentSession,
+): Promise<void> {
+  printRunConfig(prompt, options);
+
+  const startedAt = Date.now();
+  const response = await session.send(prompt);
+
+  printFinalResponse(response, Date.now() - startedAt);
 }
 
 function printRunConfig(prompt: string, options: CliOptions): void {

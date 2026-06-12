@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
+import { defineTool } from 'unified-llm-client';
 
 import type { JsonObject, JsonValue, ToolDefinition } from './types.js';
 
@@ -23,7 +24,7 @@ const DEFAULT_IGNORED_NAMES = new Set([
 ]);
 
 export interface FileToolOptions {
-  allowEdits: boolean;
+  allowEdits: boolean | (() => boolean);
   maxReadBytes?: number;
   projectRoot: string;
 }
@@ -33,7 +34,7 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
   const maxReadBytes = options.maxReadBytes ?? DEFAULT_MAX_READ_BYTES;
 
   return [
-    {
+    defineTool({
       name: 'list_files',
       description: 'List files and directories under a project-relative directory.',
       parameters: {
@@ -63,8 +64,8 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
             .sort((left, right) => left.name.localeCompare(right.name)),
         };
       },
-    },
-    {
+    }),
+    defineTool({
       name: 'list_tree',
       description:
         'List a depth-limited project tree under a project-relative directory, skipping generated and vendor directories.',
@@ -72,19 +73,19 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
         type: 'object',
         properties: {
           dir: {
-            type: ['string', 'null'],
+            type: 'string',
             description: 'Project-relative directory path. Defaults to ".".',
           },
           maxDepth: {
-            type: ['integer', 'null'],
+            type: 'integer',
             description: 'Maximum directory depth to recurse. Defaults to 2 and caps at 5.',
           },
           maxEntries: {
-            type: ['integer', 'null'],
+            type: 'integer',
             description: 'Maximum entries to return. Defaults to 200 and caps at 1000.',
           },
         },
-        required: ['dir', 'maxDepth', 'maxEntries'],
+        required: [],
         additionalProperties: false,
       },
       async execute(args) {
@@ -112,8 +113,8 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
           entries: result.entries,
         };
       },
-    },
-    {
+    }),
+    defineTool({
       name: 'search_files',
       description:
         'Search text files under the project root using ripgrep. Returns project-relative file, line, and text matches.',
@@ -125,19 +126,19 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
             description: 'Literal or regex search query passed to rg.',
           },
           path: {
-            type: ['string', 'null'],
+            type: 'string',
             description: 'Project-relative file or directory to search. Defaults to ".".',
           },
           glob: {
-            type: ['string', 'null'],
+            type: 'string',
             description: 'Optional rg glob, such as "*.ts" or "src/**/*.ts".',
           },
           maxResults: {
-            type: ['integer', 'null'],
+            type: 'integer',
             description: 'Maximum number of matches to return. Defaults to 50 and caps at 200.',
           },
         },
-        required: ['query', 'path', 'glob', 'maxResults'],
+        required: ['query'],
         additionalProperties: false,
       },
       async execute(args) {
@@ -164,8 +165,8 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
           matches: result.matches,
         };
       },
-    },
-    {
+    }),
+    defineTool({
       name: 'git_diff',
       description:
         'Show the current Git diff for the project, optionally scoped to one project-relative path. Read-only.',
@@ -173,19 +174,19 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
         type: 'object',
         properties: {
           path: {
-            type: ['string', 'null'],
+            type: 'string',
             description: 'Optional project-relative file or directory to diff.',
           },
           staged: {
-            type: ['boolean', 'null'],
+            type: 'boolean',
             description: 'When true, show staged changes with git diff --cached. Defaults to false.',
           },
           maxBytes: {
-            type: ['integer', 'null'],
+            type: 'integer',
             description: 'Maximum diff output bytes. Defaults to 96000 and caps at 200000.',
           },
         },
-        required: ['path', 'staged', 'maxBytes'],
+        required: [],
         additionalProperties: false,
       },
       async execute(args) {
@@ -215,8 +216,8 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
           truncated: result.truncated,
         };
       },
-    },
-    {
+    }),
+    defineTool({
       name: 'run_command',
       description:
         'Run a small allowlist of project verification commands. No arbitrary shell commands or custom arguments.',
@@ -229,11 +230,11 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
             description: 'Allowlisted command to run.',
           },
           maxBytes: {
-            type: ['integer', 'null'],
+            type: 'integer',
             description: 'Maximum stdout output bytes. Defaults to 96000 and caps at 200000.',
           },
         },
-        required: ['command', 'maxBytes'],
+        required: ['command'],
         additionalProperties: false,
       },
       async execute(args) {
@@ -257,8 +258,8 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
           truncated: result.truncated,
         };
       },
-    },
-    {
+    }),
+    defineTool({
       name: 'read_file',
       description: 'Read a UTF-8 text file under the project root.',
       parameters: {
@@ -276,8 +277,8 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
         const file = getString(args, 'file');
         return readTextFile(projectRoot, file, maxReadBytes);
       },
-    },
-    {
+    }),
+    defineTool({
       name: 'read_many_files',
       description:
         'Read multiple UTF-8 text files under the project root in one call. Returns per-file results and errors.',
@@ -292,12 +293,12 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
             },
           },
           maxBytesPerFile: {
-            type: ['integer', 'null'],
+            type: 'integer',
             description:
               'Optional per-file byte limit. Defaults to 128000 and caps at the configured read limit.',
           },
         },
-        required: ['files', 'maxBytesPerFile'],
+        required: ['files'],
         additionalProperties: false,
       },
       async execute(args) {
@@ -332,8 +333,8 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
           results,
         };
       },
-    },
-    {
+    }),
+    defineTool({
       name: 'apply_patch',
       description:
         'Validate or apply a unified diff patch under the project root. Dry-run unless edits are explicitly allowed.',
@@ -345,11 +346,11 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
             description: 'Unified diff patch to validate or apply.',
           },
           maxBytes: {
-            type: ['integer', 'null'],
+            type: 'integer',
             description: 'Maximum command output bytes. Defaults to 96000 and caps at 200000.',
           },
         },
-        required: ['patch', 'maxBytes'],
+        required: ['patch'],
         additionalProperties: false,
       },
       async execute(args) {
@@ -383,7 +384,7 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
           };
         }
 
-        if (!options.allowEdits) {
+        if (!resolveAllowEdits(options)) {
           return {
             applied: false,
             dryRun: true,
@@ -414,8 +415,8 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
           reason: apply.exitCode === 0 ? 'Patch applied.' : 'Patch failed while applying.',
         };
       },
-    },
-    {
+    }),
+    defineTool({
       name: 'write_file',
       description:
         'Create or overwrite a UTF-8 text file under the project root. Dry-run unless edits are explicitly allowed.',
@@ -431,11 +432,11 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
             description: 'Full UTF-8 file content to write.',
           },
           overwrite: {
-            type: ['boolean', 'null'],
+            type: 'boolean',
             description: 'Set true to overwrite an existing file. Defaults to false.',
           },
         },
-        required: ['file', 'content', 'overwrite'],
+        required: ['file', 'content'],
         additionalProperties: false,
       },
       async execute(args) {
@@ -464,16 +465,17 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
           };
         }
 
+        const allowEdits = resolveAllowEdits(options);
         const result = {
-          written: options.allowEdits,
-          dryRun: !options.allowEdits,
+          written: allowEdits,
+          dryRun: !allowEdits,
           file,
           bytes,
           exists,
           overwrite,
         };
 
-        if (!options.allowEdits) {
+        if (!allowEdits) {
           return {
             ...result,
             reason: 'Dry-run mode is enabled. Run without --dry-run, or use :allow-edits in interactive mode, to write this file.',
@@ -483,8 +485,8 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
         await fs.writeFile(filePath, content, 'utf8');
         return result;
       },
-    },
-    {
+    }),
+    defineTool({
       name: 'edit_file',
       description:
         'Replace exactly one occurrence of oldText with newText in an existing UTF-8 project file. Returns a dry-run result when dry-run mode is enabled.',
@@ -528,14 +530,14 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
 
         const updated = original.replace(oldText, newText);
         const result = {
-          edited: options.allowEdits,
+          edited: resolveAllowEdits(options),
           file,
-          dryRun: !options.allowEdits,
+          dryRun: !resolveAllowEdits(options),
           removedChars: oldText.length,
           addedChars: newText.length,
         };
 
-        if (!options.allowEdits) {
+        if (!resolveAllowEdits(options)) {
           return {
             ...result,
             reason: 'Dry-run mode is enabled. Run without --dry-run, or use :allow-edits in interactive mode, to write this change.',
@@ -545,8 +547,12 @@ export function createFileTools(options: FileToolOptions): ToolDefinition[] {
         await fs.writeFile(filePath, updated, 'utf8');
         return result;
       },
-    },
+    }),
   ];
+}
+
+function resolveAllowEdits(options: FileToolOptions): boolean {
+  return typeof options.allowEdits === 'function' ? options.allowEdits() : options.allowEdits;
 }
 
 export async function resolveInsideProject(projectRoot: string, requestedPath: string): Promise<string> {

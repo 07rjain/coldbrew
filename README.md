@@ -2,7 +2,7 @@
 
 Coldbrew is a calm local coding-agent CLI inspired by Mihail Eric's article.
 
-It uses the OpenAI Responses API with local function tools:
+It uses LLMlibrary conversations with local function tools:
 
 - `list_files`
 - `list_tree`
@@ -32,7 +32,7 @@ pnpm build
 pnpm install:cli
 ```
 
-Set `OPENAI_API_KEY` in your environment or `.env`. Optionally set `OPENAI_MODEL`; the CLI defaults to `gpt-5.5`.
+Set `OPENAI_API_KEY` in your environment or `.env`. Optionally set `OPENAI_MODEL`; the CLI defaults to `gpt-5.4`.
 
 Install `rg`/ripgrep for fast code search. On macOS:
 
@@ -82,7 +82,7 @@ create the file we discussed
 exit
 ```
 
-Each line is sent to the agent as a new task, and the session keeps recent conversation memory for follow-up requests. Type `exit`, `quit`, or `:q` to close the session.
+Each line is sent to the same LLMlibrary conversation, so follow-up requests can refer to prior turns. Type `exit`, `quit`, or `:q` to close the session.
 
 Interactive commands:
 
